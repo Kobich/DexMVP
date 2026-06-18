@@ -2,7 +2,7 @@
 
 ## Цель
 
-DexMVP демонстрирует контролируемую динамическую загрузку Android-кода. Host-приложение загружает заранее согласованный remote-модуль, проверяет его целостность и запускает только известный entry point, который реализует общий контракт `RemoteFeature`.
+DexMVP демонстрирует контролируемую динамическую загрузку Android-кода. Host-приложение загружает заранее согласованный remote-модуль, проверяет его целостность и запускает только entry point из manifest. Entry point может реализовать `RemoteFeature` для обычного output-сценария или `RemoteComposeFeature` для remote Compose-экрана.
 
 ## Компоненты
 
@@ -31,6 +31,14 @@ interface RemoteFeature {
     val version: Int
     fun execute(input: RemoteInput): RemoteOutput
 }
+
+interface RemoteComposeFeature {
+    val id: String
+    val version: Int
+
+    @Composable
+    fun Content(input: RemoteInput, host: RemoteHost)
+}
 ```
 
 Host использует этот интерфейс после загрузки класса через `DexClassLoader`. Remote-модуль компилируется против этого же API.
@@ -46,7 +54,7 @@ Host использует этот интерфейс после загрузк�
 - `Sha256Verifier` - проверяет SHA-256 скачанного файла.
 - `ModuleStorage` - сохраняет artifact во внутреннее хранилище приложения.
 - `DexModuleLoader` - загружает entry point через `DexClassLoader`.
-- `RemoteFeatureRunner` - проверяет совместимость API и вызывает `execute()`.
+- `RemoteFeatureRunner` - проверяет совместимость API и вызывает `execute()` или загружает Compose-фичу.
 - `RemoteModuleRepository` - фасад для UI.
 
 UI фичи:
@@ -55,13 +63,16 @@ UI фичи:
 
 ### `remote-module`
 
-Отдельный Android APK, который содержит demo-реализацию remote-фичи:
+Отдельный Android APK, который содержит demo-реализации remote-фич:
 
 ```text
 com.engboost.remote.HelloRemoteFeature
+com.engboost.remote.CounterComposeFeature
+com.engboost.remote.ProfileCardComposeFeature
+com.engboost.remote.ChecklistComposeFeature
 ```
 
-Класс имеет public no-arg constructor и реализует `RemoteFeature`.
+Классы имеют public no-arg constructor и реализуют `RemoteFeature` или `RemoteComposeFeature`.
 
 ### `server`
 
@@ -89,7 +100,7 @@ MainActivity
   -> RemoteModuleRepository.run()
   -> RemoteFeatureRunner
   -> DexModuleLoader
-  -> RemoteFeature.execute()
+  -> RemoteFeature.execute() OR RemoteComposeFeature.Content()
 ```
 
 ## Manifest
@@ -102,10 +113,25 @@ MainActivity
   "version": 1,
   "hostApiVersion": 1,
   "minHostApi": 1,
-  "entryPoint": "com.engboost.remote.HelloRemoteFeature",
   "artifactUrl": "http://10.0.2.2:8080/api/v1/modules/hello/1/artifact",
   "sha256": "calculated-by-server",
-  "signature": ""
+  "signature": "",
+  "features": [
+    {
+      "id": "hello-output",
+      "title": "Hello Output",
+      "kind": "output",
+      "version": 1,
+      "entryPoint": "com.engboost.remote.HelloRemoteFeature"
+    },
+    {
+      "id": "counter-compose",
+      "title": "Counter Compose",
+      "kind": "compose",
+      "version": 1,
+      "entryPoint": "com.engboost.remote.CounterComposeFeature"
+    }
+  ]
 }
 ```
 
@@ -113,8 +139,8 @@ Host проверяет:
 
 - `minHostApi <= HOST_API_VERSION`;
 - SHA-256 скачанного artifact совпадает с manifest;
-- загруженный класс реализует `RemoteFeature`;
-- `feature.id` и `feature.version` совпадают с manifest.
+- загруженный класс реализует контракт, соответствующий `features[].kind`;
+- `feature.id` и `feature.version` совпадают с записью feature в manifest.
 
 ## Хранение artifact
 

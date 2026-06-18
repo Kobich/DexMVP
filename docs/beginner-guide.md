@@ -32,8 +32,8 @@ host скачивает APK
 host проверяет SHA-256
 host кладет APK во внутреннее хранилище
 host делает APK read-only
-host загружает entryPoint через DexClassLoader
-host вызывает RemoteFeature.execute()
+host загружает выбранный features[].entryPoint через DexClassLoader
+host вызывает RemoteFeature.execute() или RemoteComposeFeature.Content()
 ```
 
 ## 2. Из чего состоит проект
@@ -109,14 +109,22 @@ interface RemoteFeature {
     val version: Int
     fun execute(input: RemoteInput): RemoteOutput
 }
+
+interface RemoteComposeFeature {
+    val id: String
+    val version: Int
+
+    @Composable
+    fun Content(input: RemoteInput, host: RemoteHost)
+}
 ```
 
 Зачем это нужно:
 
 - host после загрузки APK получает какой-то объект;
 - host должен понять, что этот объект умеет выполнять нужную функцию;
-- поэтому объект должен реализовать `RemoteFeature`;
-- host приводит объект к `RemoteFeature` и вызывает `execute()`.
+- поэтому объект должен реализовать `RemoteFeature` или `RemoteComposeFeature`;
+- host приводит объект к нужному контракту и вызывает `execute()` или `Content()`.
 
 Важно:
 
@@ -217,7 +225,7 @@ moduleId
 version
 hostApiVersion
 minHostApi
-entryPoint
+features[].entryPoint
 artifactUrl
 sha256
 signature
@@ -271,9 +279,9 @@ filesDir/remote-modules/hello-1.apk
 взять путь к APK
 создать optimized dir в codeCacheDir
 создать DexClassLoader
-загрузить class по manifest.entryPoint
+загрузить class по выбранному features[].entryPoint
 создать instance через no-arg constructor
-привести instance к RemoteFeature
+привести instance к RemoteFeature или RemoteComposeFeature
 ```
 
 ### `RemoteFeatureRunner`
@@ -306,18 +314,24 @@ remote-module
 
 ```text
 remote-module/src/main/java/com/engboost/remote/HelloRemoteFeature.kt
+remote-module/src/main/java/com/engboost/remote/CounterComposeFeature.kt
+remote-module/src/main/java/com/engboost/remote/ProfileCardComposeFeature.kt
+remote-module/src/main/java/com/engboost/remote/ChecklistComposeFeature.kt
 ```
 
 Он реализует:
 
 ```kotlin
-RemoteFeature
+RemoteFeature или RemoteComposeFeature
 ```
 
 Класс указан в manifest server:
 
 ```text
 com.engboost.remote.HelloRemoteFeature
+com.engboost.remote.CounterComposeFeature
+com.engboost.remote.ProfileCardComposeFeature
+com.engboost.remote.ChecklistComposeFeature
 ```
 
 Важно:
@@ -330,12 +344,12 @@ com.engboost.remote.HelloRemoteFeature
 Почему `compileOnly`:
 
 ```text
-RemoteFeature должен жить в host app
+RemoteFeature, RemoteComposeFeature и Compose runtime должны жить в host app
 remote APK компилируется против него
 но не тащит свою вторую копию интерфейса
 ```
 
-Если положить копию `RemoteFeature` внутрь remote APK, можно получить проблему type identity: класс вроде называется так же, но classloader видит другой тип.
+Если положить копию `RemoteFeature`, `RemoteComposeFeature` или Compose runtime внутрь remote APK, можно получить проблему type identity: класс вроде называется так же, но classloader видит другой тип.
 
 ## 8. `server`
 
@@ -424,11 +438,11 @@ RemoteExecutionDemoScreen
   -> RemoteFeatureRunner.run()
   -> DexModuleLoader.load()
   -> DexClassLoader
-  -> loadClass(manifest.entryPoint)
+  -> loadClass(selectedFeature.entryPoint)
   -> newInstance()
-  -> instance as RemoteFeature
-  -> feature.execute(RemoteInput(...))
-  -> RemoteOutput
+  -> instance as RemoteFeature или RemoteComposeFeature
+  -> feature.execute(...) или feature.Content(...)
+  -> RemoteOutput или remote Compose UI
   -> UI показывает результат
 ```
 
@@ -456,7 +470,7 @@ Run app on emulator
 
 ```text
 Server URL = http://10.0.2.2:8080
-Check -> Download -> Run
+Check -> Download -> Open
 ```
 
 ## 13. Как понять, что все работает
@@ -474,8 +488,10 @@ App:
 ```text
 Check complete
 Download complete
-Run complete
-Execution Result = Hello from remote module
+Open hello-output complete
+Hello Output открывается на отдельном экране
+Counter/Profile/Checklist открываются на отдельном экране
+Back возвращает на список фич
 ```
 
 ## 14. Что переносить в рабочий проект
@@ -504,9 +520,8 @@ compileOnly(project(":feature:remote-execution:api"))
 ## 15. Самые важные места, которые нельзя случайно сломать
 
 - `com.engboost.remoteapi` должен совпадать у host и remote APK.
-- `entryPoint` в server manifest должен совпадать с реальным class name в remote APK.
+- `features[].entryPoint` в server manifest должен совпадать с реальным class name в remote APK.
 - `remote-module` должен использовать `compileOnly(project(":feature:remote-execution:api"))`.
 - APK должен быть собран до запуска server.
 - Для emulator server URL должен быть `http://10.0.2.2:8080`.
 - Для физического телефона нужен IP компьютера в локальной сети.
-

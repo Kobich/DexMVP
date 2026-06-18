@@ -1,5 +1,6 @@
 param(
     [string]$BaseUrl = "http://10.0.2.2:8080",
+    [int]$Port = 8080,
     [string]$ArtifactPath = ""
 )
 
@@ -15,6 +16,7 @@ if (((-not $env:JAVA_HOME) -or (-not (Test-Path "$env:JAVA_HOME\bin\java.exe")) 
 }
 
 $env:DEX_SERVER_BASE_URL = $BaseUrl
+$env:DEX_SERVER_PORT = "$Port"
 if ($ArtifactPath -ne "") {
     $env:DEX_REMOTE_ARTIFACT = $ArtifactPath
 }
@@ -27,7 +29,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "Starting server..."
-Write-Host "Local PC URL: http://localhost:8080"
+Write-Host "Local PC URL: http://localhost:$Port"
 Write-Host "Manifest artifactUrl base: $BaseUrl"
 Write-Host "Stop server with Ctrl+C."
 & .\gradlew.bat :server:run

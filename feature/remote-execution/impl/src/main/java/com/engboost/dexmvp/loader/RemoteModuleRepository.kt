@@ -1,6 +1,7 @@
 package com.engboost.dexmvp.loader
 
 import android.content.Context
+import com.engboost.remoteapi.RemoteComposeFeature
 import com.engboost.remoteapi.RemoteInput
 import com.engboost.remoteapi.RemoteOutput
 import java.io.File
@@ -31,7 +32,16 @@ class RemoteModuleRepository(
     }
 
     fun run(manifest: RemoteModuleManifest, artifact: File, input: RemoteInput): RemoteOutput {
-        return runner.run(manifest, artifact, input)
+        val feature = manifest.features.firstOrNull()
+            ?: error("Manifest does not contain features")
+        return runOutput(manifest, feature, artifact, input)
+    }
+
+    fun runOutput(manifest: RemoteModuleManifest, feature: RemoteFeatureManifest, artifact: File, input: RemoteInput): RemoteOutput {
+        return runner.runOutput(manifest, feature, artifact, input)
+    }
+
+    fun loadCompose(manifest: RemoteModuleManifest, feature: RemoteFeatureManifest, artifact: File): RemoteComposeFeature {
+        return runner.loadCompose(manifest, feature, artifact)
     }
 }
-

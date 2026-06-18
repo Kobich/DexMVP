@@ -5,7 +5,7 @@ import com.engboost.remoteapi.RemoteInput
 import com.engboost.remoteapi.RemoteOutput
 
 class HelloRemoteFeature : RemoteFeature {
-    override val id: String = "hello"
+    override val id: String = "hello-output"
     override val version: Int = 1
 
     override fun execute(input: RemoteInput): RemoteOutput {
@@ -15,4 +15,3 @@ class HelloRemoteFeature : RemoteFeature {
         )
     }
 }
-

@@ -9,8 +9,8 @@ MVP закрывает базовые риски uncontrolled dynamic loading:
 - artifact хранится во внутреннем хранилище приложения;
 - artifact помечается read-only до загрузки;
 - host проверяет совместимость `minHostApi`;
-- host загружает только manifest-defined `entryPoint`;
-- загруженный объект обязан реализовать `RemoteFeature`;
+- host загружает только manifest-defined `features[].entryPoint`;
+- загруженный объект обязан реализовать `RemoteFeature` или `RemoteComposeFeature`;
 - remote-модуль не получает Android `Context` напрямую.
 
 ## Что не защищает MVP
@@ -34,7 +34,7 @@ Dynamic Code Loading опасен, потому что приложение на
 - получает код только с контролируемого сервера;
 - требует manifest;
 - проверяет SHA-256;
-- использует узкий контракт `RemoteFeature`;
+- использует узкий контракт `RemoteFeature` / `RemoteComposeFeature`;
 - не передает remote-модулю полный доступ к host API.
 
 ## Android 14+
@@ -56,7 +56,7 @@ download -> sha256 verify -> copy to internal storage -> set read-only -> DexCla
 - certificate pinning для server API;
 - rollback на последнюю валидную версию;
 - запрет downgrade по `version`;
-- allowlist `moduleId` и `entryPoint`;
+- allowlist `moduleId` и `features[].entryPoint`;
 - аудит API, доступного remote-модулю;
 - отдельная threat model;
 - проверка Google Play policy или выбор альтернативы: Play Feature Delivery, server-driven config, DSL, WebView/JS sandbox.

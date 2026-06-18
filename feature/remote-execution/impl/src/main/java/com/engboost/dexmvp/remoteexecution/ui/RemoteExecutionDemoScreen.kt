@@ -29,17 +29,30 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.engboost.dexmvp.loader.RemoteFeatureManifest
 import com.engboost.dexmvp.loader.RemoteModuleManifest
 import com.engboost.dexmvp.loader.RemoteModuleRepository
+import com.engboost.remoteapi.RemoteComposeFeature
+import com.engboost.remoteapi.RemoteEvent
+import com.engboost.remoteapi.RemoteFeatureKind
+import com.engboost.remoteapi.RemoteHost
 import com.engboost.remoteapi.RemoteInput
 import kotlinx.coroutines.launch
 import java.io.File
 
+private sealed interface RemoteExecutionRoute {
+    data object Home : RemoteExecutionRoute
+    data class Feature(val title: String) : RemoteExecutionRoute
+}
+
 private data class RemoteExecutionDemoState(
     val serverUrl: String = "http://10.0.2.2:8080",
+    val route: RemoteExecutionRoute = RemoteExecutionRoute.Home,
     val isBusy: Boolean = false,
     val manifest: RemoteModuleManifest? = null,
     val artifactPath: String? = null,
+    val selectedFeature: RemoteFeatureManifest? = null,
+    val composeFeature: RemoteComposeFeature? = null,
     val resultTitle: String? = null,
     val resultMessage: String? = null,
     val error: String? = null,
@@ -53,7 +66,7 @@ fun RemoteExecutionDemoScreen() {
     var state by remember { mutableStateOf(RemoteExecutionDemoState()) }
 
     fun appendEvent(message: String) {
-        state = state.copy(events = (listOf(message) + state.events).take(8))
+        state = state.copy(events = (listOf(message) + state.events).take(10))
     }
 
     fun repository(): RemoteModuleRepository {
@@ -74,6 +87,104 @@ fun RemoteExecutionDemoScreen() {
         }
     }
 
+    val remoteHost = remember {
+        object : RemoteHost {
+            override fun emit(event: RemoteEvent) {
+                appendEvent("${event.type}: ${event.message}")
+            }
+        }
+    }
+
+    when (val route = state.route) {
+        RemoteExecutionRoute.Home -> {
+            RemoteExecutionHomeScreen(
+                state = state,
+                onServerUrlChange = { state = state.copy(serverUrl = it) },
+                onCheck = {
+                    runAsync("Check") {
+                        val manifest = repository().fetchManifest()
+                        state.copy(
+                            manifest = manifest,
+                            selectedFeature = null,
+                            composeFeature = null,
+                            resultTitle = null,
+                            resultMessage = null,
+                        )
+                    }
+                },
+                onDownload = {
+                    runAsync("Download") {
+                        val manifest = state.manifest ?: repository().fetchManifest()
+                        val artifact = repository().downloadAndVerify(manifest)
+                        state.copy(manifest = manifest, artifactPath = artifact.absolutePath)
+                    }
+                },
+                onOpen = { feature ->
+                    runAsync("Open ${feature.id}") {
+                        val manifest = state.manifest ?: error("Check module first")
+                        val artifactPath = state.artifactPath ?: error("Download module first")
+                        val artifact = File(artifactPath)
+                        if (feature.kind == RemoteFeatureKind.COMPOSE) {
+                            val composeFeature = repository().loadCompose(manifest, feature, artifact)
+                            state.copy(
+                                route = RemoteExecutionRoute.Feature(feature.title),
+                                selectedFeature = feature,
+                                composeFeature = composeFeature,
+                                resultTitle = null,
+                                resultMessage = null,
+                            )
+                        } else {
+                            val output = repository().runOutput(
+                                manifest = manifest,
+                                feature = feature,
+                                artifact = artifact,
+                                input = demoInput(),
+                            )
+                            state.copy(
+                                route = RemoteExecutionRoute.Feature(feature.title),
+                                selectedFeature = feature,
+                                composeFeature = null,
+                                resultTitle = output.title,
+                                resultMessage = output.message,
+                            )
+                        }
+                    }
+                },
+            )
+        }
+
+        is RemoteExecutionRoute.Feature -> {
+            RemoteFeatureScreen(
+                title = route.title,
+                feature = state.selectedFeature,
+                composeFeature = state.composeFeature,
+                resultTitle = state.resultTitle,
+                resultMessage = state.resultMessage,
+                events = state.events,
+                host = remoteHost,
+                onBack = {
+                    state = state.copy(
+                        route = RemoteExecutionRoute.Home,
+                        selectedFeature = null,
+                        composeFeature = null,
+                        resultTitle = null,
+                        resultMessage = null,
+                    )
+                    appendEvent("Back to feature list")
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun RemoteExecutionHomeScreen(
+    state: RemoteExecutionDemoState,
+    onServerUrlChange: (String) -> Unit,
+    onCheck: () -> Unit,
+    onDownload: () -> Unit,
+    onOpen: (RemoteFeatureManifest) -> Unit,
+) {
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         Column(
             modifier = Modifier
@@ -91,66 +202,93 @@ fun RemoteExecutionDemoScreen() {
 
             OutlinedTextField(
                 value = state.serverUrl,
-                onValueChange = { state = state.copy(serverUrl = it) },
+                onValueChange = onServerUrlChange,
                 label = { Text("Server URL") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    enabled = !state.isBusy,
-                    onClick = {
-                        runAsync("Check") {
-                            val manifest = repository().fetchManifest()
-                            state.copy(manifest = manifest, resultTitle = null, resultMessage = null)
-                        }
-                    },
-                ) {
+                Button(enabled = !state.isBusy, onClick = onCheck) {
                     Text("Check")
                 }
 
-                Button(
-                    enabled = !state.isBusy,
-                    onClick = {
-                        runAsync("Download") {
-                            val manifest = state.manifest ?: repository().fetchManifest()
-                            val artifact = repository().downloadAndVerify(manifest)
-                            state.copy(manifest = manifest, artifactPath = artifact.absolutePath)
-                        }
-                    },
-                ) {
+                Button(enabled = !state.isBusy, onClick = onDownload) {
                     Text("Download")
-                }
-
-                OutlinedButton(
-                    enabled = !state.isBusy,
-                    onClick = {
-                        runAsync("Run") {
-                            val manifest = state.manifest ?: error("Check or Download module first")
-                            val artifactPath = state.artifactPath ?: error("Download module first")
-                            val output = repository().run(
-                                manifest = manifest,
-                                artifact = File(artifactPath),
-                                input = RemoteInput(
-                                    text = "Host call from DexMVP",
-                                    timestampMillis = System.currentTimeMillis(),
-                                ),
-                            )
-                            state.copy(resultTitle = output.title, resultMessage = output.message)
-                        }
-                    },
-                ) {
-                    Text("Run")
                 }
             }
 
             state.error?.let { ErrorCard(it) }
-            state.manifest?.let { ManifestCard(it, state.artifactPath) }
-            ResultCard(state.resultTitle, state.resultMessage)
+            state.manifest?.let { manifest ->
+                ManifestCard(manifest, state.artifactPath)
+                FeatureListCard(
+                    features = manifest.features,
+                    isBusy = state.isBusy,
+                    canOpen = state.artifactPath != null,
+                    onOpen = onOpen,
+                )
+            }
             EventLogCard(state.events)
         }
     }
+}
+
+@Composable
+private fun RemoteFeatureScreen(
+    title: String,
+    feature: RemoteFeatureManifest?,
+    composeFeature: RemoteComposeFeature?,
+    resultTitle: String?,
+    resultMessage: String?,
+    events: List<String>,
+    host: RemoteHost,
+    onBack: () -> Unit,
+) {
+    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                    feature?.let {
+                        Text(
+                            "${it.kind} | ${it.entryPoint}",
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                OutlinedButton(onClick = onBack) {
+                    Text("Back")
+                }
+            }
+
+            if (composeFeature != null) {
+                RemoteComposeContent(feature = composeFeature, host = host)
+            } else {
+                ResultCard(resultTitle, resultMessage)
+            }
+
+            EventLogCard(events)
+        }
+    }
+}
+
+private fun demoInput(): RemoteInput {
+    return RemoteInput(
+        text = "Host call from DexMVP",
+        timestampMillis = System.currentTimeMillis(),
+    )
 }
 
 @Composable
@@ -171,15 +309,62 @@ private fun ManifestCard(manifest: RemoteModuleManifest, artifactPath: String?) 
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text("Active Module", fontWeight = FontWeight.SemiBold)
+            Text("Remote Artifact", fontWeight = FontWeight.SemiBold)
             InfoLine("moduleId", manifest.moduleId)
             InfoLine("version", manifest.version.toString())
             InfoLine("minHostApi", manifest.minHostApi.toString())
-            InfoLine("entryPoint", manifest.entryPoint)
+            InfoLine("features", manifest.features.size.toString())
             InfoLine("sha256", manifest.sha256)
             InfoLine("artifact", artifactPath ?: "not downloaded")
         }
     }
+}
+
+@Composable
+private fun FeatureListCard(
+    features: List<RemoteFeatureManifest>,
+    isBusy: Boolean,
+    canOpen: Boolean,
+    onOpen: (RemoteFeatureManifest) -> Unit,
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("Remote Features", fontWeight = FontWeight.SemiBold)
+            features.forEach { feature ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(feature.title, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "${feature.kind} | ${feature.entryPoint}",
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    OutlinedButton(
+                        enabled = !isBusy && canOpen,
+                        onClick = { onOpen(feature) },
+                    ) {
+                        Text("Open")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RemoteComposeContent(
+    feature: RemoteComposeFeature,
+    host: RemoteHost,
+) {
+    feature.Content(input = demoInput(), host = host)
 }
 
 @Composable
@@ -189,8 +374,8 @@ private fun ResultCard(title: String?, message: String?) {
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text("Execution Result", fontWeight = FontWeight.SemiBold)
-            Text(title ?: "No result yet", style = MaterialTheme.typography.titleMedium)
+            Text("Output Feature Result", fontWeight = FontWeight.SemiBold)
+            Text(title ?: "No output feature result yet", style = MaterialTheme.typography.titleMedium)
             if (message != null) {
                 Text(message, style = MaterialTheme.typography.bodyMedium)
             }

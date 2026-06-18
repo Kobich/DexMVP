@@ -1,6 +1,7 @@
 package com.engboost.dexmvp.loader
 
 import android.content.Context
+import com.engboost.remoteapi.RemoteComposeFeature
 import com.engboost.remoteapi.RemoteFeature
 import dalvik.system.DexClassLoader
 import java.io.File
@@ -8,7 +9,19 @@ import java.io.File
 class DexModuleLoader(
     private val context: Context,
 ) {
-    fun load(manifest: RemoteModuleManifest, artifact: File): RemoteFeature {
+    fun loadOutputFeature(manifest: RemoteModuleManifest, feature: RemoteFeatureManifest, artifact: File): RemoteFeature {
+        val instance = loadInstance(manifest, feature, artifact)
+        return instance as? RemoteFeature
+            ?: error("${feature.entryPoint} does not implement RemoteFeature")
+    }
+
+    fun loadComposeFeature(manifest: RemoteModuleManifest, feature: RemoteFeatureManifest, artifact: File): RemoteComposeFeature {
+        val instance = loadInstance(manifest, feature, artifact)
+        return instance as? RemoteComposeFeature
+            ?: error("${feature.entryPoint} does not implement RemoteComposeFeature")
+    }
+
+    private fun loadInstance(manifest: RemoteModuleManifest, feature: RemoteFeatureManifest, artifact: File): Any {
         require(artifact.exists()) { "Artifact does not exist: ${artifact.absolutePath}" }
         require(!artifact.canWrite()) { "Artifact must be read-only before loading" }
 
@@ -21,10 +34,7 @@ class DexModuleLoader(
             null,
             context.classLoader,
         )
-        val entryClass = classLoader.loadClass(manifest.entryPoint)
-        val instance = entryClass.getDeclaredConstructor().newInstance()
-        return instance as? RemoteFeature
-            ?: error("${manifest.entryPoint} does not implement RemoteFeature")
+        val entryClass = classLoader.loadClass(feature.entryPoint)
+        return entryClass.getDeclaredConstructor().newInstance()
     }
 }
-

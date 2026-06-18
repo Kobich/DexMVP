@@ -8,9 +8,17 @@ data class RemoteModuleManifest(
     val version: Int,
     val hostApiVersion: Int,
     val minHostApi: Int,
-    val entryPoint: String,
     val artifactUrl: String,
     val sha256: String,
     val signature: String = "",
+    val features: List<RemoteFeatureManifest>,
 )
 
+@Serializable
+data class RemoteFeatureManifest(
+    val id: String,
+    val title: String,
+    val kind: String,
+    val version: Int,
+    val entryPoint: String,
+)

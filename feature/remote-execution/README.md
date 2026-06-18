@@ -14,6 +14,9 @@ Gradle module:
 
 ```text
 com.engboost.remoteapi.RemoteFeature
+com.engboost.remoteapi.RemoteComposeFeature
+com.engboost.remoteapi.RemoteHost
+com.engboost.remoteapi.RemoteEvent
 com.engboost.remoteapi.RemoteInput
 com.engboost.remoteapi.RemoteOutput
 ```
@@ -31,12 +34,13 @@ Gradle module:
 Содержит:
 
 - demo UI `RemoteExecutionDemoScreen`;
+- host-owned экран выбранной remote-фичи с `Back`;
 - HTTP manifest client;
 - artifact downloader;
 - SHA-256 verifier;
 - internal storage;
 - `DexClassLoader`;
-- runner, который вызывает `RemoteFeature.execute()`.
+- runner, который вызывает `RemoteFeature.execute()` или загружает `RemoteComposeFeature`.
 
 ## Как встраивать в рабочий проект
 
@@ -50,7 +54,14 @@ Remote APK должен компилироваться против:
 
 ```kotlin
 compileOnly(project(":feature:remote-execution:api"))
+compileOnly(platform(libs.androidx.compose.bom))
+compileOnly(libs.androidx.compose.runtime)
+compileOnly(libs.androidx.compose.foundation)
+compileOnly(libs.androidx.compose.ui)
+compileOnly(libs.androidx.compose.material3)
 ```
+
+Compose-зависимости в remote APK держатся `compileOnly`, чтобы remote artifact не упаковывал вторую копию Compose runtime. Runtime-классы приходят из host app через parent classloader `DexClassLoader`.
 
 Если demo UI не нужен, оставь loader-классы из `impl`, а `RemoteExecutionDemoScreen` замени на свою ViewModel/use case.
 
@@ -64,5 +75,6 @@ compileOnly(project(":feature:remote-execution:api"))
 ## Что менять осторожно
 
 - Package `com.engboost.remoteapi` - должен совпадать между host и remote APK.
-- `entryPoint` в manifest - должен указывать на реальный класс remote APK.
-- `compileOnly` у `remote-module` - важно для единого `RemoteFeature` type identity.
+- `features[].entryPoint` в manifest - должен указывать на реальный класс remote APK.
+- `compileOnly` у `remote-module` - важно для единого `RemoteFeature` / `RemoteComposeFeature` type identity.
+- Версии Compose compiler/runtime у host и remote APK должны быть совместимы.

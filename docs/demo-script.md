@@ -64,7 +64,13 @@ curl http://localhost:8080/api/v1/modules/active
 {
   "moduleId": "hello",
   "version": 1,
-  "entryPoint": "com.engboost.remote.HelloRemoteFeature",
+  "features": [
+    {
+      "id": "hello-output",
+      "kind": "output",
+      "entryPoint": "com.engboost.remote.HelloRemoteFeature"
+    }
+  ],
   "sha256": "..."
 }
 ```
@@ -90,7 +96,7 @@ http://10.0.2.2:8080
 Ожидаемо:
 
 - приложение получает manifest;
-- на экране появляется `moduleId`, `version`, `entryPoint`, `sha256`;
+- на экране появляется `moduleId`, `version`, `features`, `sha256`;
 - в event log появляется `Check complete`.
 
 Нажать `Download`.
@@ -103,7 +109,7 @@ http://10.0.2.2:8080
 - на экране появляется путь к artifact;
 - в event log появляется `Download complete`.
 
-Нажать `Run`.
+Выбрать `Hello Output` и нажать `Open`.
 
 Ожидаемо:
 
@@ -111,6 +117,17 @@ http://10.0.2.2:8080
 - приводит объект к `RemoteFeature`;
 - вызывает `execute()`;
 - показывает результат `Hello from remote module`.
+
+Выбрать `Counter Compose`, `Profile Card` или `Checklist` и нажать `Open`.
+
+Ожидаемо:
+
+- приложение загружает выбранный Compose entry point;
+- приводит объект к `RemoteComposeFeature`;
+- переходит на отдельный экран выбранной фичи;
+- вызывает `Content()`;
+- на экране появляется remote Compose UI.
+- кнопка `Back` возвращает на список фич.
 
 ## 6. Негативные проверки
 
@@ -134,7 +151,7 @@ http://10.0.2.2:8080
 
 ### Wrong entry point
 
-Вернуть несуществующий `entryPoint`.
+Вернуть несуществующий `features[].entryPoint`.
 
 Ожидаемо:
 
@@ -145,5 +162,4 @@ http://10.0.2.2:8080
 
 Короткое объяснение:
 
-> Я сделал controlled dynamic loading prototype. Host app сначала получает manifest с версией, entry point и SHA-256, скачивает APK с trusted local Ktor server, проверяет целостность, сохраняет файл во внутреннее хранилище, помечает read-only и только после этого загружает класс через DexClassLoader. Запускается не произвольный код, а заранее согласованный контракт RemoteFeature.
-
+> Я сделал controlled dynamic loading prototype. Host app сначала получает manifest со списком фич, entry point и SHA-256, скачивает APK с trusted local Ktor server, проверяет целостность, сохраняет файл во внутреннее хранилище, помечает read-only и только после этого загружает выбранный класс через DexClassLoader. Запускается не произвольный код, а заранее согласованный контракт RemoteFeature или RemoteComposeFeature.

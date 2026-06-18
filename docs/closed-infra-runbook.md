@@ -126,7 +126,7 @@ http://10.0.2.2:8080
 7. Нажать:
 
 ```text
-Check -> Download -> Run
+Check -> Download -> Open
 ```
 
 ## 7. Запуск на физическом устройстве
@@ -201,20 +201,23 @@ Manifest был получен от одной версии APK, а скачал
 
 ### Class not found
 
-`entryPoint` в server manifest не совпадает с классом внутри remote APK.
+`features[].entryPoint` в server manifest не совпадает с классом внутри remote APK.
 
 Проверить:
 
 ```text
 server/src/main/kotlin/com/engboost/server/modules/ModuleRegistry.kt
 remote-module/src/main/java/com/engboost/remote/HelloRemoteFeature.kt
+remote-module/src/main/java/com/engboost/remote/CounterComposeFeature.kt
+remote-module/src/main/java/com/engboost/remote/ProfileCardComposeFeature.kt
+remote-module/src/main/java/com/engboost/remote/ChecklistComposeFeature.kt
 ```
 
-### ClassCastException / does not implement RemoteFeature
+### ClassCastException / does not implement RemoteFeature или RemoteComposeFeature
 
 Обычно проблема в контракте:
 
-- remote APK упаковал свою копию `RemoteFeature`;
+- remote APK упаковал свою копию `RemoteFeature`, `RemoteComposeFeature` или Compose runtime;
 - package `com.engboost.remoteapi` поменяли только с одной стороны;
 - remote-module использует не `compileOnly`, а `implementation`.
 
@@ -238,4 +241,3 @@ compileOnly(project(":feature:remote-execution:api"))
 - Сделать zip проекта без `build` папок.
 - Сохранить успешные команды запуска в README.
 - Держать рядом `remote-module-debug.apk`, если сборка remote module временно недоступна.
-

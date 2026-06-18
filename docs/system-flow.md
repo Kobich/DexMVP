@@ -11,6 +11,7 @@ app
 
 remote-module
   -> compileOnly feature:remote-execution:api
+  -> compileOnly Compose dependencies
 
 server
   -> не зависит от Android модулей
@@ -42,14 +43,16 @@ Server не компилирует remote APK. Он только отдает ф
 
 ## Почему remote-module зависит от api через `compileOnly`
 
-Host app уже содержит `RemoteFeature`.
+Host app уже содержит `RemoteFeature`, `RemoteComposeFeature` и Compose runtime.
 
-Remote APK должен знать этот интерфейс на этапе компиляции, но не должен упаковывать свою копию внутрь APK.
+Remote APK должен знать эти интерфейсы и Compose API на этапе компиляции, но не должен упаковывать свою копию внутрь APK.
 
 Иначе может получиться:
 
 ```text
 host RemoteFeature != remote APK RemoteFeature
+host RemoteComposeFeature != remote APK RemoteComposeFeature
+host Compose runtime != remote APK Compose runtime
 ```
 
 Даже если package и class name одинаковые, разные classloader могут сделать это разными типами.
@@ -69,11 +72,14 @@ host RemoteFeature != remote APK RemoteFeature
 10. App проверяет SHA-256
 11. App сохраняет APK во внутреннее хранилище
 12. App делает APK read-only
-13. User нажимает Run
-14. App создает DexClassLoader
-15. App загружает HelloRemoteFeature
-16. App вызывает execute()
-17. UI показывает RemoteOutput
+13. User выбирает фичу и нажимает Open
+14. Host переключает UI route на отдельный RemoteFeatureScreen
+15. App создает DexClassLoader
+16. App загружает feature entryPoint из manifest.features[]
+17. Для output-фичи App вызывает execute()
+18. Для compose-фичи App вызывает Content()
+19. UI показывает RemoteOutput или remote Compose content
+20. Back возвращает на список фич
 ```
 
 ## Где менять поведение
@@ -106,6 +112,14 @@ server/src/main/kotlin/com/engboost/server/modules/ModuleRegistry.kt
 remote-module/src/main/java/com/engboost/remote/...
 ```
 
+### Добавить новую remote Compose-фичу
+
+1. Создать класс в `remote-module`, который реализует `RemoteComposeFeature`.
+2. Добавить запись в `features` внутри `ModuleRegistry`.
+3. Пересобрать `:remote-module:assembleDebug`.
+4. Перезапустить server.
+5. В app нажать `Check -> Download -> Open`.
+
 ### Добавить подпись artifact
 
 Точки входа:
@@ -123,4 +137,3 @@ RemoteModuleRepository.downloadAndVerify()
 ModuleStorage
 RemoteModuleRepository
 ```
-

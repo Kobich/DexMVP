@@ -15,6 +15,8 @@
 Общий контракт между host и remote APK:
 
 - `RemoteFeature` - интерфейс, который реализует remote-класс.
+- `RemoteComposeFeature` - интерфейс для remote Compose-экрана.
+- `RemoteHost` - callback из remote UI обратно в host.
 - `RemoteInput` - входные данные для remote-кода.
 - `RemoteOutput` - результат remote-кода.
 
@@ -28,7 +30,10 @@ Demo UI:
 
 - `Check` получает manifest;
 - `Download` скачивает APK и проверяет SHA-256;
-- `Run` загружает APK через `DexClassLoader` и вызывает `RemoteFeature.execute()`.
+- `Open` загружает выбранный entry point через `DexClassLoader`.
+- Для `kind = output` вызывается `RemoteFeature.execute()`.
+- Для `kind = compose` host встраивает `RemoteComposeFeature.Content()`.
+- Remote-контент открывается на отдельном host-owned экране с кнопкой `Back`.
 
 В рабочем проекте этот экран можно заменить на ViewModel/use case, оставив loader-классы ниже.
 
@@ -39,7 +44,7 @@ Demo UI:
 - `Sha256Verifier` - расчет и проверка SHA-256.
 - `ModuleStorage` - сохранение APK во внутреннее хранилище и read-only перед загрузкой.
 - `DexModuleLoader` - создание `DexClassLoader` и инстанса entry point.
-- `RemoteFeatureRunner` - проверки `minHostApi`, `moduleId`, `version`, затем `execute()`.
+- `RemoteFeatureRunner` - проверки `minHostApi`, `feature.id`, `feature.version`, затем `execute()` или загрузка Compose-фичи.
 - `RemoteModuleRepository` - фасад, который объединяет все шаги для UI.
 
 Путь:
@@ -52,11 +57,18 @@ feature/remote-execution/impl/src/main/java/com/engboost/dexmvp/loader
 
 - `remote-module/src/main/java/com/engboost/remote/HelloRemoteFeature.kt`
 
-Demo implementation. Класс должен:
+Demo implementations. Сейчас APK содержит:
 
-- реализовать `RemoteFeature`;
+- `HelloRemoteFeature` - output-фича.
+- `CounterComposeFeature` - интерактивный счетчик.
+- `ProfileCardComposeFeature` - карточка профиля.
+- `ChecklistComposeFeature` - чеклист.
+
+Каждый класс должен:
+
+- реализовать `RemoteFeature` или `RemoteComposeFeature`;
 - иметь public no-arg constructor;
-- совпадать с `entryPoint` в server manifest.
+- совпадать с `features[].entryPoint` в server manifest.
 
 ## Server
 
@@ -81,6 +93,5 @@ MainActivity
   -> Sha256Verifier
   -> ModuleStorage
   -> DexModuleLoader
-  -> RemoteFeature.execute()
+  -> RemoteFeature.execute() OR RemoteComposeFeature.Content()
 ```
-

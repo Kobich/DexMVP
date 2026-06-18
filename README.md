@@ -7,8 +7,8 @@ Host-приложение получает manifest активного remote-м
 ## Что показывает проект
 
 - Android host не запускает произвольный код из сети без проверки.
-- Manifest фиксирует `moduleId`, `version`, `minHostApi`, `entryPoint`, `artifactUrl`, `sha256`.
-- Remote APK компилируется отдельно и реализует общий контракт `RemoteFeature`.
+- Manifest фиксирует `moduleId`, `version`, `minHostApi`, `artifactUrl`, `sha256` и список `features`.
+- Remote APK компилируется отдельно и может содержать несколько entry point: output-фичи и Compose-фичи.
 - Ktor server отдает manifest и APK-артефакт.
 - UI показывает этапы `Check`, `Download`, `Run`, ошибки, manifest и результат выполнения remote-кода.
 
@@ -17,7 +17,7 @@ Host-приложение получает manifest активного remote-м
 - `app` - Android Compose host-приложение.
 - `feature:remote-execution:api` - общий контракт host и remote-модуля.
 - `feature:remote-execution:impl` - UI демо, загрузка manifest, скачивание APK, SHA-256, internal storage, `DexClassLoader`.
-- `remote-module` - demo APK с `com.engboost.remote.HelloRemoteFeature`.
+- `remote-module` - demo APK с output-фичей и несколькими Compose-фичами.
 - `server` - Ktor server с endpoints manifest/artifact.
 
 ## Быстрый запуск
@@ -49,7 +49,7 @@ http://10.0.2.2:8080
 В приложении нажать:
 
 ```text
-Check -> Download -> Run
+Check -> Download -> Open
 ```
 
 ## Запуск на физическом устройстве
@@ -83,6 +83,7 @@ http://YOUR_HOST_IP:8080
 - [Security Notes](docs/security-notes.md)
 - [Feature Integration Notes](feature/remote-execution/README.md)
 - [Closed Infra Runbook](docs/closed-infra-runbook.md)
+- [Possible Changes and Build Notes](docs/possible-changes.md)
 
 ## Как проверить проект
 
@@ -130,8 +131,9 @@ curl http://localhost:8080/api/v1/modules/hello/1/artifact --output remote-modul
 1. Запустить `server`.
 2. Запустить `app`.
 3. В `Server URL` оставить `http://10.0.2.2:8080`.
-4. Нажать `Check -> Download -> Run`.
-5. Убедиться, что на экране появился результат `Hello from remote module`.
+4. Нажать `Check -> Download`.
+5. В списке `Remote Features` открыть `Hello Output`, `Counter Compose`, `Profile Card` или `Checklist`.
+6. Убедиться, что output-фича показывает текстовый результат, а Compose-фичи рендерят remote UI.
 
 ## Ограничения MVP
 

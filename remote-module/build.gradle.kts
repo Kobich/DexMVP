@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.compose)
 }
 
 android {
@@ -22,8 +23,17 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
+    buildFeatures {
+        compose = true
+    }
 }
 
 dependencies {
     compileOnly(project(":feature:remote-execution:api"))
+    compileOnly(platform(libs.androidx.compose.bom))
+    compileOnly(libs.androidx.compose.runtime)
+    compileOnly(libs.androidx.compose.foundation)
+    compileOnly(libs.androidx.compose.ui)
+    compileOnly(libs.androidx.compose.material3)
 }

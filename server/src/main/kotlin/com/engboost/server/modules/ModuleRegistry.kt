@@ -21,10 +21,39 @@ class ModuleRegistry(
             version = version,
             hostApiVersion = 1,
             minHostApi = 1,
-            entryPoint = "com.engboost.remote.HelloRemoteFeature",
             artifactUrl = "${baseUrl.trimEnd('/')}/api/v1/modules/$moduleId/$version/artifact",
             sha256 = Sha256.calculate(artifact),
             signature = "",
+            features = listOf(
+                ServerFeatureManifest(
+                    id = "hello-output",
+                    title = "Hello Output",
+                    kind = "output",
+                    version = 1,
+                    entryPoint = "com.engboost.remote.HelloRemoteFeature",
+                ),
+                ServerFeatureManifest(
+                    id = "counter-compose",
+                    title = "Counter Compose",
+                    kind = "compose",
+                    version = 1,
+                    entryPoint = "com.engboost.remote.CounterComposeFeature",
+                ),
+                ServerFeatureManifest(
+                    id = "profile-compose",
+                    title = "Profile Card",
+                    kind = "compose",
+                    version = 1,
+                    entryPoint = "com.engboost.remote.ProfileCardComposeFeature",
+                ),
+                ServerFeatureManifest(
+                    id = "checklist-compose",
+                    title = "Checklist",
+                    kind = "compose",
+                    version = 1,
+                    entryPoint = "com.engboost.remote.ChecklistComposeFeature",
+                ),
+            ),
         )
     }
 
@@ -55,9 +84,17 @@ data class ServerModuleManifest(
     val version: Int,
     val hostApiVersion: Int,
     val minHostApi: Int,
-    val entryPoint: String,
     val artifactUrl: String,
     val sha256: String,
     val signature: String,
+    val features: List<ServerFeatureManifest>,
 )
 
+@Serializable
+data class ServerFeatureManifest(
+    val id: String,
+    val title: String,
+    val kind: String,
+    val version: Int,
+    val entryPoint: String,
+)
