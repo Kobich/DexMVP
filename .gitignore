@@ -14,3 +14,11 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Local/offline native dependency bundles.
+/third_party/curl-android/include/**
+/third_party/curl-android/libs/**
+!/third_party/curl-android/include/
+!/third_party/curl-android/include/.gitkeep
+!/third_party/curl-android/libs/
+!/third_party/curl-android/libs/.gitkeep

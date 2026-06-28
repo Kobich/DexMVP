@@ -56,10 +56,27 @@ Host использует этот интерфейс после загрузк�
 - `DexModuleLoader` - загружает entry point через `DexClassLoader`.
 - `RemoteFeatureRunner` - проверяет совместимость API и вызывает `execute()` или загружает Compose-фичу.
 - `RemoteModuleRepository` - фасад для UI.
+- `RemoteTransport` / `OkHttpRemoteTransport` / `Http3RemoteTransport` - сетевой слой manifest/artifact.
 
 UI фичи:
 
 - `RemoteExecutionDemoScreen` - demo screen, который вызывает repository и показывает manifest/result/log.
+
+### `native-http3`
+
+Изолированный модуль native/JNI HTTP/3 transport.
+
+Сейчас это Java API + opt-in NDK/CMake + JNI bridge к prebuilt `libcurl` с HTTP/3. Обычная Gradle-синхронизация не требует native-сборки: CMake включается только флагом `-PnativeHttp3.enableCmake=true`, а реальный curl backend — флагом `-PnativeHttp3.enableCurl=true`. Для локального стенда подтверждён сценарий `HTTP3_ONLY -> Check -> Download -> Open` через NGINX HTTP/3 в WSL.
+
+```text
+feature:remote-execution:impl
+  -> Http3RemoteTransport
+    -> native-http3
+      -> JNI
+        -> libcurl + ngtcp2/nghttp3 + OpenSSL
+```
+
+Loader-слой не должен знать, каким протоколом скачан manifest или artifact.
 
 ### `remote-module`
 
@@ -92,9 +109,11 @@ MainActivity
   -> RemoteExecutionDemoScreen
   -> RemoteModuleRepository.fetchManifest()
   -> ManifestApiClient
+  -> RemoteTransport
   -> Ktor /api/v1/modules/active
   -> RemoteModuleRepository.downloadAndVerify()
   -> ArtifactDownloader
+  -> RemoteTransport
   -> Sha256Verifier
   -> ModuleStorage
   -> RemoteModuleRepository.run()

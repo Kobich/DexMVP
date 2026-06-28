@@ -75,15 +75,11 @@ http://YOUR_HOST_IP:8080
 
 ## Документация
 
-- [Разбор с нуля](docs/beginner-guide.md)
-- [Архитектура](docs/architecture.md)
-- [Карта кода](docs/code-map.md)
-- [System Flow](docs/system-flow.md)
-- [Demo Script](docs/demo-script.md)
-- [Security Notes](docs/security-notes.md)
-- [Feature Integration Notes](feature/remote-execution/README.md)
-- [Closed Infra Runbook](docs/closed-infra-runbook.md)
-- [Possible Changes and Build Notes](docs/possible-changes.md)
+- [Deployment Guide](docs/deployment-guide.md)
+- [Документация: индекс](docs/README.md)
+- [Agent Start Here](docs/AGENT-START-HERE.md)
+
+Если нужно развернуть проект, начинать с `docs/deployment-guide.md`. Остальные документы открывать через `docs/README.md` по конкретной задаче.
 
 ## Как проверить проект
 

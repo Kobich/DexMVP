@@ -1,6 +1,8 @@
 package com.engboost.dexmvp.loader
 
 import android.content.Context
+import com.engboost.dexmvp.transport.OkHttpRemoteTransport
+import com.engboost.dexmvp.transport.RemoteTransport
 import com.engboost.remoteapi.RemoteComposeFeature
 import com.engboost.remoteapi.RemoteInput
 import com.engboost.remoteapi.RemoteOutput
@@ -9,9 +11,10 @@ import java.io.File
 class RemoteModuleRepository(
     context: Context,
     serverBaseUrl: String,
+    transport: RemoteTransport = OkHttpRemoteTransport(),
 ) {
-    private val apiClient = ManifestApiClient(serverBaseUrl)
-    private val downloader = ArtifactDownloader()
+    private val apiClient = ManifestApiClient(serverBaseUrl, transport)
+    private val downloader = ArtifactDownloader(transport)
     private val storage = ModuleStorage(context)
     private val verifier = Sha256Verifier()
     private val runner = RemoteFeatureRunner(DexModuleLoader(context))

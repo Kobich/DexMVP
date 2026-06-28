@@ -53,6 +53,49 @@ Demo UI:
 feature/remote-execution/impl/src/main/java/com/engboost/dexmvp/loader
 ```
 
+## Feature Impl Transport
+
+- `RemoteTransport` - общий интерфейс для manifest/artifact transport.
+- `OkHttpRemoteTransport` - текущий рабочий HTTP fallback.
+- `FallbackRemoteTransport` - transport wrapper для режима `HTTP3_PREFERRED`.
+- `RemoteTransportFactory` - создает transport по выбранному режиму.
+- `TransportMode` - `HTTP_FALLBACK`, `HTTP3_PREFERRED`, `HTTP3_ONLY`.
+- `Http3RemoteTransport` - адаптер к `native-http3`; выполняет manifest/artifact запросы через libcurl HTTP/3 JNI backend.
+- `TransportDiagnosticsProvider` - данные для UI diagnostics: mode/backend/TLS/native engine.
+
+Путь:
+
+```text
+feature/remote-execution/impl/src/main/java/com/engboost/dexmvp/transport
+```
+
+## Native HTTP/3
+
+- `docs/AGENT-START-HERE.md` - главный entrypoint для будущего агента/локальной модели.
+- `native-http3/src/main/java/com/engboost/nativehttp3/NativeHttp3Client.java` - Java-вход в JNI/libcurl HTTP/3.
+- `native-http3/src/main/java/com/engboost/nativehttp3/NativeHttp3Config.java` - базовые настройки timeout/TLS.
+- `native-http3/src/main/java/com/engboost/nativehttp3/NativeHttp3UnavailableException.java` - диагностическая ошибка, если native-библиотека или curl backend недоступны.
+- `native-http3/src/main/cpp/CMakeLists.txt` - opt-in CMake-конфиг; собирает JNI bridge и линкует prebuilt curl/OpenSSL/ngtcp2/nghttp3 static libs.
+- `native-http3/src/main/cpp/native_http3_client.cpp` - JNI bridge `nativeEngineInfo()`, `nativeGetString()`, `nativeDownload()`.
+- `scripts/verify-native-http3.ps1` - проверяет сборку `native-http3` с включённым CMake.
+- `scripts/verify-native-http3-curl.ps1` - проверяет сборку `native-http3` с prebuilt libcurl.
+- `scripts/check-curl-android-layout.ps1` - проверяет наличие `curl.h` и `libcurl.so` по ABI.
+- `third_party/curl-android/README.md` - шаблон offline bundle для закрытого контура.
+- `docs/http3-curl-source-strategy.md` - решение, откуда брать `libcurl` и почему не стоит тащить случайный `.so`.
+- `docs/http3-curl-build-guide.md` - пошаговая инструкция: получить approved bundle или собрать через vcpkg.
+- `docs/http3-current-state.md` - текущий статус HTTP/3 стенда, адреса, ограничения и следующие шаги.
+- `docs/http3-critical-handoff.md` - критичный handoff: HTTP/3 заработал, TLS через debug CA, как восстановить стенд.
+- `docs/http3-setup-guide.md` - последовательная установка HTTP/3 стенда Windows + WSL + Android.
+- `docs/http3-tls-guide.md` - локальный CA, NGINX server cert и Android/libcurl trust.
+- `docs/scripts-reference.md` - справочник всех helper scripts.
+- `scripts/import-curl-from-vcpkg.ps1` - копирует собранный vcpkg `curl[http3]` в `third_party/curl-android`.
+- `scripts/build-http3-apk.ps1` - собирает `app-debug.apk` с HTTP/3 curl flags под выбранный ABI.
+- `scripts/install-http3-apk.ps1` - устанавливает собранный APK через `adb` и запускает приложение.
+- `scripts/show-http3-wsl-state.ps1` - показывает текущий WSL IP и команду запуска Ktor с правильным `BaseUrl`.
+- `scripts/wsl-generate-http3-certs.sh` - WSL-скрипт генерации локального CA/server cert и копирования CA в Android debug resources.
+
+CMake выключен по умолчанию, чтобы не ломать Gradle sync на машинах без NDK. Реальный HTTP/3 включается скриптами `build-http3-apk.ps1` / `install-http3-apk.ps1`, которые передают Gradle flags для CMake и curl backend.
+
 ## Remote APK
 
 - `remote-module/src/main/java/com/engboost/remote/HelloRemoteFeature.kt`

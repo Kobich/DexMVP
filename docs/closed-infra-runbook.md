@@ -1,5 +1,7 @@
 # Closed Infra Runbook
 
+Стартовая инструкция по развёртыванию: `docs/deployment-guide.md`.
+
 Этот файл нужен для работы на компьютере без нормального интернета и с ограниченными AI-инструментами.
 
 ## 1. Что взять с собой
@@ -20,10 +22,12 @@ gradle/wrapper/gradle-wrapper.properties
 gradle/libs.versions.toml
 app
 feature
+native-http3
 remote-module
 server
 docs
 scripts
+third_party
 ```
 
 Желательно взять уже прогретый Gradle cache с машины, где проект собирался:
@@ -44,6 +48,13 @@ scripts
 - JDK/JBR, который видит Gradle;
 - Android emulator или физическое устройство;
 - PowerShell.
+
+Для HTTP/3 дополнительно:
+
+- Android NDK;
+- CMake;
+- WSL с NGINX mainline, собранным/установленным с HTTP/3 module;
+- offline `third_party/curl-android` bundle.
 
 Проверить Java:
 
@@ -237,7 +248,53 @@ compileOnly(project(":feature:remote-execution:api"))
 
 - Сохранить Gradle cache после успешной сборки.
 - Сохранить Android SDK platform `36`.
+- Сохранить Android NDK и CMake installer/cache.
 - Сохранить этот проект с `docs` и `scripts`.
 - Сделать zip проекта без `build` папок.
+- Перенести `third_party/curl-android` отдельным archive, если реальные libs/headers не коммитятся.
 - Сохранить успешные команды запуска в README.
 - Держать рядом `remote-module-debug.apk`, если сборка remote module временно недоступна.
+
+Не переносить в git/archive проекта:
+
+- `build`, `.gradle`, `.cxx`;
+- private key локального CA;
+- NGINX server private key;
+- machine-specific cert/private key файлы.
+
+## 10. HTTP/3 offline bundle
+
+Для HTTP/3 не нужно собирать `libcurl` на закрытом компьютере. Проще перенести готовый bundle:
+
+```text
+third_party/curl-android
+```
+
+Минимальная структура:
+
+```text
+third_party/curl-android/include/curl/curl.h
+third_party/curl-android/libs/arm64-v8a/libcurl.a или libcurl.so
+third_party/curl-android/libs/x86_64/libcurl.a или libcurl.so
+```
+
+Проверка структуры:
+
+```powershell
+.\scripts\check-curl-android-layout.ps1
+```
+
+Проверка сборки native HTTP/3 с curl:
+
+```powershell
+.\scripts\verify-native-http3-curl.ps1
+```
+
+Если bundle ещё не готов, это нормально. Основной проект проверяется без него:
+
+```powershell
+.\scripts\verify-project.ps1
+.\scripts\verify-native-http3.ps1
+```
+
+Как выбрать источник `libcurl`: `docs/http3-curl-source-strategy.md`.
