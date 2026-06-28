@@ -14,3 +14,7 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Keep third_party/curl-android visible to git.
+# This project needs the curl headers/libs for offline HTTP/3 builds in closed infrastructure.
+# Generated native outputs are still ignored by .cxx and **/build/.

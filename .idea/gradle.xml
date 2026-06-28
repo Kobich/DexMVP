@@ -14,6 +14,7 @@
             <option value="$PROJECT_DIR$/feature/remote-execution" />
             <option value="$PROJECT_DIR$/feature/remote-execution/api" />
             <option value="$PROJECT_DIR$/feature/remote-execution/impl" />
+            <option value="$PROJECT_DIR$/native-http3" />
             <option value="$PROJECT_DIR$/remote-module" />
             <option value="$PROJECT_DIR$/server" />
           </set>

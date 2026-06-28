@@ -32,6 +32,10 @@ import androidx.compose.ui.unit.dp
 import com.engboost.dexmvp.loader.RemoteFeatureManifest
 import com.engboost.dexmvp.loader.RemoteModuleManifest
 import com.engboost.dexmvp.loader.RemoteModuleRepository
+import com.engboost.dexmvp.transport.TransportDiagnostics
+import com.engboost.dexmvp.transport.TransportDiagnosticsProvider
+import com.engboost.dexmvp.transport.RemoteTransportFactory
+import com.engboost.dexmvp.transport.TransportMode
 import com.engboost.remoteapi.RemoteComposeFeature
 import com.engboost.remoteapi.RemoteEvent
 import com.engboost.remoteapi.RemoteFeatureKind
@@ -47,6 +51,7 @@ private sealed interface RemoteExecutionRoute {
 
 private data class RemoteExecutionDemoState(
     val serverUrl: String = "http://10.0.2.2:8080",
+    val transportMode: TransportMode = TransportMode.HTTP_FALLBACK,
     val route: RemoteExecutionRoute = RemoteExecutionRoute.Home,
     val isBusy: Boolean = false,
     val manifest: RemoteModuleManifest? = null,
@@ -70,7 +75,11 @@ fun RemoteExecutionDemoScreen() {
     }
 
     fun repository(): RemoteModuleRepository {
-        return RemoteModuleRepository(context, state.serverUrl)
+        return RemoteModuleRepository(
+            context = context,
+            serverBaseUrl = state.serverUrl,
+            transport = RemoteTransportFactory.create(state.transportMode, context),
+        )
     }
 
     fun runAsync(label: String, block: suspend () -> RemoteExecutionDemoState) {
@@ -100,6 +109,7 @@ fun RemoteExecutionDemoScreen() {
             RemoteExecutionHomeScreen(
                 state = state,
                 onServerUrlChange = { state = state.copy(serverUrl = it) },
+                onTransportModeChange = { state = state.copy(transportMode = it) },
                 onCheck = {
                     runAsync("Check") {
                         val manifest = repository().fetchManifest()
@@ -181,10 +191,16 @@ fun RemoteExecutionDemoScreen() {
 private fun RemoteExecutionHomeScreen(
     state: RemoteExecutionDemoState,
     onServerUrlChange: (String) -> Unit,
+    onTransportModeChange: (TransportMode) -> Unit,
     onCheck: () -> Unit,
     onDownload: () -> Unit,
     onOpen: (RemoteFeatureManifest) -> Unit,
 ) {
+    val appContext = LocalContext.current.applicationContext
+    val transportDiagnostics = remember(state.transportMode) {
+        TransportDiagnosticsProvider.inspect(state.transportMode, appContext)
+    }
+
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         Column(
             modifier = Modifier
@@ -208,6 +224,14 @@ private fun RemoteExecutionHomeScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            TransportModeCard(
+                selected = state.transportMode,
+                enabled = !state.isBusy,
+                onSelected = onTransportModeChange,
+            )
+
+            TransportDiagnosticsCard(transportDiagnostics)
+
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(enabled = !state.isBusy, onClick = onCheck) {
                     Text("Check")
@@ -229,6 +253,70 @@ private fun RemoteExecutionHomeScreen(
                 )
             }
             EventLogCard(state.events)
+        }
+    }
+}
+
+@Composable
+private fun TransportDiagnosticsCard(diagnostics: TransportDiagnostics) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text("Transport Diagnostics", fontWeight = FontWeight.SemiBold)
+            InfoLine("mode", diagnostics.mode.label)
+            InfoLine("transport", diagnostics.transport)
+            InfoLine("tls", diagnostics.tlsVerification)
+            InfoLine("native", diagnostics.nativeLayer)
+            InfoLine("ca", diagnostics.caFilePath)
+            InfoLine("engine", diagnostics.engine, maxLines = 6)
+        }
+    }
+}
+
+@Composable
+private fun TransportModeCard(
+    selected: TransportMode,
+    enabled: Boolean,
+    onSelected: (TransportMode) -> Unit,
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("Transport", fontWeight = FontWeight.SemiBold)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                TransportMode.entries.forEach { mode ->
+                    val isSelected = mode == selected
+                    if (isSelected) {
+                        Button(
+                            enabled = enabled,
+                            onClick = { onSelected(mode) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(mode.label)
+                        }
+                    } else {
+                        OutlinedButton(
+                            enabled = enabled,
+                            onClick = { onSelected(mode) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(mode.label)
+                        }
+                    }
+                }
+            }
+            Text(
+                text = when (selected) {
+                    TransportMode.HTTP_FALLBACK -> "Uses current OkHttp transport."
+                    TransportMode.HTTP3_PREFERRED -> "Tries local libcurl HTTP/3 first, then falls back to OkHttp."
+                    TransportMode.HTTP3_ONLY -> "Uses local libcurl HTTP/3 only."
+                },
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
     }
 }
@@ -399,12 +487,12 @@ private fun EventLogCard(events: List<String>) {
 }
 
 @Composable
-private fun InfoLine(label: String, value: String) {
+private fun InfoLine(label: String, value: String, maxLines: Int = 2) {
     Column {
         Text(label, style = MaterialTheme.typography.labelMedium)
         Text(
             text = value,
-            maxLines = 2,
+            maxLines = maxLines,
             overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.bodyMedium,
         )

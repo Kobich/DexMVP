@@ -26,6 +26,7 @@ rootProject.name = "DexMVP"
 include(":app")
 include(":feature:remote-execution:api")
 include(":feature:remote-execution:impl")
+include(":native-http3")
 include(":remote-module")
 include(":server")
  

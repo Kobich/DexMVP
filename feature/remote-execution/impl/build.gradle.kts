@@ -28,6 +28,7 @@ android {
 
 dependencies {
     implementation(project(":feature:remote-execution:api"))
+    implementation(project(":native-http3"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
