@@ -23,6 +23,7 @@
 
 - `docs/deployment-guide.md`
 - `docs/http3-setup-guide.md`
+- `docs/nginx-http3-from-scratch.md`
 - `docs/http3-tls-guide.md`
 - `docs/http3-critical-handoff.md`
 
@@ -70,6 +71,8 @@
 
 - Gradle cache, если закрытая машина без интернета;
 - Android SDK/NDK/CMake installer/cache.
+
+Если можно перенести только zip проекта, сложить эти внешние файлы в `offline-artifacts/` перед упаковкой. Назначение папки описано в `offline-artifacts/README.md`.
 
 Не тащить как исходники:
 

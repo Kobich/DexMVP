@@ -44,6 +44,8 @@ Ktor не становится HTTP/3 сервером. HTTP/3 endpoint — эт
 - OpenSSL;
 - curl для обычных HTTPS/proxy проверок.
 
+В offline-инфраструктуре этот guide предполагает, что NGINX уже установлен или принесён готовым package/image. Если нужно ставить/собирать NGINX HTTP/3 с нуля, смотреть `docs/nginx-http3-from-scratch.md`.
+
 Проверка NGINX:
 
 ```bash
@@ -84,6 +86,8 @@ nginx -V 2>&1 | grep -o -- '--with-http_v3_module'
 ```
 
 ## 3. Настроить NGINX в WSL
+
+Если закрытая машина без интернета, самый простой перенос — WSL export/import готового Ubuntu с установленным NGINX HTTP/3. Команды: `docs/deployment-guide.md`, раздел `8.1. Как Принести Готовый NGINX HTTP/3`.
 
 Текущий config:
 
@@ -200,6 +204,8 @@ Transport mode = HTTP3_ONLY
 ```text
 Check -> Download -> Open
 ```
+
+Чтобы доказать, что это именно HTTP/3, а не обычный HTTPS/HTTP2, использовать режим `HTTP3_ONLY` и NGINX marker `$http3`. Команды: `docs/deployment-guide.md`, раздел `8.2. Как Проверить, Что Это Реально HTTP/3`.
 
 ## 10. Важные ограничения
 

@@ -18,3 +18,8 @@ local.properties
 # Keep third_party/curl-android visible to git.
 # This project needs the curl headers/libs for offline HTTP/3 builds in closed infrastructure.
 # Generated native outputs are still ignored by .cxx and **/build/.
+
+# Local transfer payloads. Keep README tracked, do not commit heavy installers/images by accident.
+/offline-artifacts/**
+!/offline-artifacts/
+!/offline-artifacts/README.md

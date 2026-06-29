@@ -52,6 +52,40 @@ Ktor сам не является HTTP/3 server. HTTP/3 endpoint — тольк�
 
 Детали по закрытой инфраструктуре: `docs/closed-infra-runbook.md`.
 
+## 2.1. Offline Package Для Машины Без Интернета
+
+Если закрытая машина не имеет доступа к интернету, заранее скачать и перенести:
+
+- полный архив проекта `DexMVP`;
+- Gradle cache: `%USERPROFILE%\.gradle\caches` и `%USERPROFILE%\.gradle\wrapper`;
+- Android Studio installer или approved portable install;
+- Android SDK platform `36`;
+- Android SDK Build Tools;
+- Android NDK;
+- CMake из Android SDK;
+- emulator system image или драйвер/настройки для физического устройства;
+- `third_party/curl-android/include` и `third_party/curl-android/libs`;
+- WSL Ubuntu image/export или готовую Linux-машину;
+- NGINX binary/package/build с HTTP/3 module или готовый WSL/Linux image, где `nginx -V` показывает `--with-http_v3_module`;
+- OpenSSL внутри WSL/Linux для генерации local CA/server cert;
+- если планируется пересобирать curl: vcpkg archive/cache и все исходники/бинарный cache vcpkg.
+
+Без этих файлов “с нуля без интернета” не получится: Gradle, Android SDK/NDK/CMake, NGINX HTTP/3 и curl bundle должны быть уже принесены внутрь контура.
+
+Если можно принести только один zip репозитория, положить внешние offline artifacts внутрь проекта перед упаковкой:
+
+```text
+offline-artifacts/
+  wsl/dexmvp-ubuntu-http3.tar
+  gradle/gradle-user-home.zip
+  android/android-sdk.zip
+  android/android-ndk.zip
+  android/android-cmake.zip
+  nginx/packages/
+```
+
+Потом упаковать всю папку `DexMVP` целиком. На закрытой машине распаковать zip и идти по этому guide. `offline-artifacts/README.md` описывает назначение этой папки.
+
 ## 3. Что Должно Быть В Репозитории
 
 Обязательно:
@@ -231,6 +265,96 @@ Server URL = https://CURRENT_WSL_IP:8443
 Transport mode = HTTP/3 only
 Check -> Download -> Open
 ```
+
+## 8.1. Как Принести Готовый NGINX HTTP/3
+
+Лучший offline-вариант для Windows + WSL: настроить NGINX HTTP/3 на машине с интернетом, затем перенести WSL distribution целиком.
+
+На машине-источнике:
+
+```powershell
+wsl --list --verbose
+wsl --shutdown
+wsl --export Ubuntu C:\transfer\dexmvp-ubuntu-http3.tar
+```
+
+Файл `dexmvp-ubuntu-http3.tar` перенести на закрытую машину.
+
+На закрытой машине:
+
+```powershell
+wsl --import DexMvpUbuntu C:\wsl\DexMvpUbuntu C:\transfer\dexmvp-ubuntu-http3.tar --version 2
+wsl -d DexMvpUbuntu
+```
+
+Проверить внутри WSL:
+
+```bash
+nginx -V 2>&1 | grep -o -- '--with-http_v3_module'
+sudo nginx -t
+```
+
+Ожидаемо:
+
+```text
+--with-http_v3_module
+nginx: configuration file ... test is successful
+```
+
+Альтернативы:
+
+- перенести готовую Linux VM image;
+- перенести approved `.deb`/package NGINX mainline и все зависимости;
+- использовать отдельный Linux server, где NGINX и Ktor крутятся на одной машине.
+
+Не лучший вариант: собирать NGINX HTTP/3 с исходников прямо в закрытой инфраструктуре. Для этого придётся заранее принести весь dependency set.
+
+Если всё-таки нужно ставить/собирать NGINX с нуля, смотреть: `docs/nginx-http3-from-scratch.md`.
+
+## 8.2. Как Проверить, Что Это Реально HTTP/3
+
+Проверка `curl -k https://...` из WSL обычно показывает только HTTPS/HTTP2. Это не доказывает HTTP/3, потому что системный curl часто собран без HTTP/3.
+
+Надёжные проверки:
+
+1. В Android app выбрать:
+
+```text
+Transport mode = HTTP/3 only
+```
+
+2. В `Transport Diagnostics` должно быть:
+
+```text
+transport = libcurl HTTP/3 via JNI
+engine = libcurl/... ngtcp2/... nghttp3/...
+tls = enabled with local debug CA
+```
+
+3. `Check -> Download -> Open` должны пройти именно в `HTTP/3 only`. В этом режиме OkHttp fallback не используется.
+
+4. На NGINX можно добавить лог/заголовок с `$http3`. По официальному NGINX `ngx_http_v3_module`, переменная `$http3` равна `h3` для HTTP/3 connections и пустая для не-HTTP/3.
+
+Пример заголовка в server block:
+
+```nginx
+add_header X-DexMvp-Http3 $http3 always;
+```
+
+После reload:
+
+```bash
+sudo nginx -t
+sudo nginx -s reload
+```
+
+Если Android HTTP/3 запрос прошёл, в response headers должен появиться:
+
+```text
+X-DexMvp-Http3: h3
+```
+
+Если значение пустое или заголовка нет, запрос пришёл не как HTTP/3.
 
 ## 9. Что Проверять После Развёртывания
 

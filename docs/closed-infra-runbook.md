@@ -39,6 +39,55 @@ third_party
 
 Иначе закрытая инфраструктура может не скачать Gradle distribution, Android Gradle Plugin, Kotlin, Ktor, OkHttp и Compose зависимости.
 
+## 1.1. Offline package, который надо скачать заранее
+
+Для машины без интернета подготовить и перенести:
+
+```text
+DexMVP project archive
+%USERPROFILE%\.gradle\caches
+%USERPROFILE%\.gradle\wrapper
+Android Studio installer или approved portable install
+Android SDK platform 36
+Android SDK Build Tools
+Android NDK
+Android SDK CMake
+emulator system image или физическое Android device + adb
+third_party/curl-android/include
+third_party/curl-android/libs
+WSL Ubuntu export или готовая Linux-машина
+NGINX package/binary/build с HTTP/3 module
+OpenSSL package внутри WSL/Linux
+```
+
+Если нужно пересобирать `curl[http3]` внутри закрытого контура, дополнительно нужны:
+
+```text
+vcpkg archive
+vcpkg binary cache
+исходники curl/ngtcp2/nghttp3/OpenSSL/zlib или approved package mirror
+```
+
+Практичный вариант: не пересобирать curl и NGINX на закрытой машине, а принести уже готовый `third_party/curl-android` и готовый WSL/Linux image с установленным NGINX HTTP/3.
+
+Если правила передачи позволяют принести только zip проекта, положить всё это внутрь проекта перед упаковкой:
+
+```text
+DexMVP/offline-artifacts/
+```
+
+Пример:
+
+```text
+DexMVP/offline-artifacts/wsl/dexmvp-ubuntu-http3.tar
+DexMVP/offline-artifacts/gradle/gradle-user-home.zip
+DexMVP/offline-artifacts/android/android-sdk.zip
+DexMVP/offline-artifacts/android/android-ndk.zip
+DexMVP/offline-artifacts/android/android-cmake.zip
+```
+
+Потом упаковать всю папку `DexMVP` целиком. В git эти тяжёлые файлы по умолчанию не коммитятся, но в ручной zip папки они попадут.
+
 ## 2. Что должно быть установлено
 
 Минимум:
