@@ -57,7 +57,7 @@ Ktor сам не является HTTP/3 server. HTTP/3 endpoint — тольк�
 Если закрытая машина не имеет доступа к интернету, заранее скачать и перенести:
 
 - полный архив проекта `DexMVP`;
-- Gradle cache: `%USERPROFILE%\.gradle\caches` и `%USERPROFILE%\.gradle\wrapper`;
+- доступ к Gradle dependencies: корпоративный Maven/Gradle mirror, заранее прогретая approved cache или другой внутренний способ;
 - Android Studio installer или approved portable install;
 - Android SDK platform `36`;
 - Android SDK Build Tools;
@@ -72,19 +72,22 @@ Ktor сам не является HTTP/3 server. HTTP/3 endpoint — тольк�
 
 Без этих файлов “с нуля без интернета” не получится: Gradle, Android SDK/NDK/CMake, NGINX HTTP/3 и curl bundle должны быть уже принесены внутрь контура.
 
-Если можно принести только один zip репозитория, положить внешние offline artifacts внутрь проекта перед упаковкой:
+Если есть виртуалка с интернетом и рабочая машина без интернета, использовать виртуалку как download/build station:
 
 ```text
-offline-artifacts/
-  wsl/dexmvp-ubuntu-http3.tar
-  gradle/gradle-user-home.zip
-  android/android-sdk.zip
-  android/android-ndk.zip
-  android/android-cmake.zip
-  nginx/packages/
+Internet VM:
+  download/build/check artifacts
+  pack transfer bundle
+
+Offline work machine:
+  unpack project
+  unpack transfer bundle
+  run checks
 ```
 
-Потом упаковать всю папку `DexMVP` целиком. На закрытой машине распаковать zip и идти по этому guide. `offline-artifacts/README.md` описывает назначение этой папки.
+`offline-artifacts/` можно использовать как локальную staging-папку для такого bundle, но тяжёлые файлы из неё не коммитятся в git.
+
+Не класть в репозиторий весь `%USERPROFILE%\.gradle`: там десятки тысяч файлов, это нестабильный и слишком тяжёлый artifact. Если без интернета Gradle не видит dependencies, решать это через approved Gradle/Maven mirror или отдельный инфраструктурный cache, а не через коммит Gradle User Home.
 
 ## 3. Что Должно Быть В Репозитории
 

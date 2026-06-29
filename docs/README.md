@@ -69,10 +69,10 @@
 
 Отдельно от проекта:
 
-- Gradle cache, если закрытая машина без интернета;
+- доступ к Gradle dependencies через mirror/cache;
 - Android SDK/NDK/CMake installer/cache.
 
-Если можно перенести только zip проекта, сложить эти внешние файлы в `offline-artifacts/` перед упаковкой. Назначение папки описано в `offline-artifacts/README.md`.
+Если есть VM с интернетом, использовать `offline-artifacts/` как локальную staging-папку для transfer bundle. Тяжёлые payload-файлы из неё не коммитятся. Назначение папки описано в `offline-artifacts/README.md`.
 
 Не тащить как исходники:
 

@@ -19,7 +19,12 @@ local.properties
 # This project needs the curl headers/libs for offline HTTP/3 builds in closed infrastructure.
 # Generated native outputs are still ignored by .cxx and **/build/.
 
-# Local transfer payloads. Keep README tracked, do not commit heavy installers/images by accident.
+# Offline transfer payloads are local-only. Use this folder for manual zip/VM transfer,
+# but keep heavy installers/images/packages out of git.
 /offline-artifacts/**
 !/offline-artifacts/
 !/offline-artifacts/README.md
+!/offline-artifacts/android/
+!/offline-artifacts/android/README.md
+!/offline-artifacts/nginx/
+!/offline-artifacts/nginx/README.md

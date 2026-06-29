@@ -1,6 +1,6 @@
 # Offline Artifacts
 
-Эта папка нужна, если в закрытую инфраструктуру можно принести только один zip проекта.
+Эта папка нужна как локальная staging-зона для передачи файлов с интернет-VM на рабочую машину без интернета.
 
 Сюда кладутся тяжёлые внешние артефакты, которые обычно не являются исходниками проекта.
 
@@ -11,8 +11,6 @@ offline-artifacts/
   README.md
   wsl/
     dexmvp-ubuntu-http3.tar
-  gradle/
-    gradle-user-home.zip
   android/
     android-studio-installer.exe
     android-sdk.zip
@@ -31,7 +29,7 @@ offline-artifacts/
 
 Если закрытая машина голая, одного исходного кода недостаточно. Тогда в zip проекта нужно добавить:
 
-- Gradle cache;
+- доступ к Gradle dependencies через mirror/cache/VM;
 - Android SDK/NDK/CMake installer или archive;
 - WSL export с готовым NGINX HTTP/3 или packages для установки NGINX;
 - emulator image или инструкции для физического устройства;
@@ -39,11 +37,20 @@ offline-artifacts/
 
 ## Git Policy
 
-По умолчанию тяжёлые файлы внутри этой папки не должны коммититься без явного решения команды.
+Тяжёлые файлы внутри этой папки не коммитятся.
 
 Идея такая:
 
-1. В рабочем git хранить только `offline-artifacts/README.md`.
-2. Перед передачей в закрытую инфраструктуру положить сюда реальные artifacts.
-3. Сделать zip всей папки проекта.
-4. На закрытой машине распаковать zip и читать `docs/deployment-guide.md`.
+1. На VM с интернетом скачать/собрать нужные files/images/packages.
+2. Положить их в `offline-artifacts/`.
+3. Сделать zip/transfer bundle.
+4. Передать bundle на рабочую машину без интернета.
+5. На рабочей машине распаковать и читать `docs/deployment-guide.md`.
+
+В git остаются только README/инструкции. Реальные payload-файлы локальные.
+
+## Что Уже Не Надо Дублировать Здесь
+
+`third_party/curl-android` уже лежит в проекте отдельно и видим для git. Не надо копировать его второй раз в `offline-artifacts`.
+
+Gradle dependencies лучше решать отдельно: через корпоративный mirror/cache или approved offline setup. Не складывать весь `%USERPROFILE%\.gradle` в репозиторий.

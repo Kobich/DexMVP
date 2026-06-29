@@ -30,14 +30,17 @@ scripts
 third_party
 ```
 
-Желательно взять уже прогретый Gradle cache с машины, где проект собирался:
+Gradle dependencies должны быть доступны через controlled offline-механизм:
 
 ```text
-%USERPROFILE%\.gradle\caches
-%USERPROFILE%\.gradle\wrapper
+корпоративный Maven/Gradle mirror
+approved Gradle cache
+внутренний artifact repository
 ```
 
 Иначе закрытая инфраструктура может не скачать Gradle distribution, Android Gradle Plugin, Kotlin, Ktor, OkHttp и Compose зависимости.
+
+Не коммитить весь `%USERPROFILE%\.gradle` в проект: там десятки тысяч файлов, это плохой переносимый artifact.
 
 ## 1.1. Offline package, который надо скачать заранее
 
@@ -45,8 +48,7 @@ third_party
 
 ```text
 DexMVP project archive
-%USERPROFILE%\.gradle\caches
-%USERPROFILE%\.gradle\wrapper
+доступ к Gradle dependencies через mirror/cache
 Android Studio installer или approved portable install
 Android SDK platform 36
 Android SDK Build Tools
@@ -70,23 +72,25 @@ vcpkg binary cache
 
 Практичный вариант: не пересобирать curl и NGINX на закрытой машине, а принести уже готовый `third_party/curl-android` и готовый WSL/Linux image с установленным NGINX HTTP/3.
 
-Если правила передачи позволяют принести только zip проекта, положить всё это внутрь проекта перед упаковкой:
+Если есть виртуалка с интернетом и рабочая машина без интернета, делать так:
 
 ```text
-DexMVP/offline-artifacts/
+1. На VM скачать/собрать нужные artifacts.
+2. На VM проверить проект и HTTP/3 bundle.
+3. Упаковать transfer bundle.
+4. Передать bundle на рабочую машину.
+5. На рабочей машине распаковать рядом с проектом.
 ```
 
-Пример:
+`offline-artifacts/` можно использовать как локальную staging-папку для передачи:
 
 ```text
 DexMVP/offline-artifacts/wsl/dexmvp-ubuntu-http3.tar
-DexMVP/offline-artifacts/gradle/gradle-user-home.zip
-DexMVP/offline-artifacts/android/android-sdk.zip
-DexMVP/offline-artifacts/android/android-ndk.zip
-DexMVP/offline-artifacts/android/android-cmake.zip
+DexMVP/offline-artifacts/android/
+DexMVP/offline-artifacts/nginx/
 ```
 
-Потом упаковать всю папку `DexMVP` целиком. В git эти тяжёлые файлы по умолчанию не коммитятся, но в ручной zip папки они попадут.
+Тяжёлые файлы внутри `offline-artifacts/` не коммитятся в git. Они нужны только для ручной передачи через VM/zip/share.
 
 ## 2. Что должно быть установлено
 
