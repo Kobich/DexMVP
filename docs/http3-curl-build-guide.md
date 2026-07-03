@@ -1,72 +1,33 @@
 # HTTP/3 curl Build Guide
 
-Цель: получить папку:
+Цель: собрать на Windows через `vcpkg` Android-бандл `libcurl` с HTTP/3 и положить его в проект так, чтобы прошла сборка `native-http3`.
 
-```text
-third_party/curl-android
-```
-
-С ней проект сможет собрать `native-http3` с реальным `libcurl`:
-
-```powershell
-.\scripts\verify-native-http3-curl.ps1
-```
-
-## Коротко: что делать
-
-Есть два нормальных пути.
-
-### Путь 1 — попросить готовый bundle
-
-Это лучший рабочий вариант.
-
-Попросить у команды инфраструктуры/security:
-
-```text
-Android libcurl with HTTP/3 support
-ABI: arm64-v8a and x86_64
-headers: include/curl/curl.h
-libraries: libcurl.so and all dependent .so files if they are dynamic
-versions: curl, ngtcp2, nghttp3, TLS backend
-licenses
-```
-
-Когда дадут файлы, разложить так:
+Итоговая папка должна выглядеть так:
 
 ```text
 third_party/curl-android/
   include/curl/curl.h
-  libs/arm64-v8a/libcurl.so
-  libs/x86_64/libcurl.so
+  libs/arm64-v8a/libcurl.so OR libcurl.a
+  libs/x86_64/libcurl.so OR libcurl.a
 ```
 
-Если рядом с `libcurl.so` есть зависимости, например TLS/QUIC `.so`, положить их в ту же ABI-папку:
+`arm64-v8a` нужен для физического устройства. `x86_64` нужен для большинства Android emulator на Windows.
 
-```text
-third_party/curl-android/libs/arm64-v8a/*.so
-third_party/curl-android/libs/x86_64/*.so
-```
+## 1. Что поставить
 
-Проверить:
-
-```powershell
-.\scripts\check-curl-android-layout.ps1
-.\scripts\verify-native-http3-curl.ps1
-```
-
-### Путь 2 — собрать самим через vcpkg
-
-Это самый понятный способ для самостоятельной сборки на машине с интернетом.
-
-Нужны:
+На машине с интернетом нужны:
 
 - Git;
-- Android SDK;
-- Android NDK;
+- Visual Studio Build Tools или Visual Studio с C++ workload;
+- Android Studio с Android SDK и Android NDK;
 - PowerShell;
-- доступ в интернет.
+- свободное место под сборку `vcpkg`.
 
-Команды:
+Важно: Android NDK должен быть установлен локально. `vcpkg` берет Android toolchain через переменную `ANDROID_NDK_HOME`.
+
+## 2. Подготовить vcpkg
+
+Пример ниже использует `C:\work\vcpkg`. Можно выбрать другой путь, но дальше надо подставлять свой.
 
 ```powershell
 git clone https://github.com/microsoft/vcpkg C:\work\vcpkg
@@ -74,65 +35,159 @@ cd C:\work\vcpkg
 .\bootstrap-vcpkg.bat
 ```
 
-Указать NDK:
+Указать путь к NDK:
 
 ```powershell
 $env:ANDROID_NDK_HOME="C:\Users\RED.DOT\AppData\Local\Android\Sdk\ndk\28.2.13676358"
 ```
 
-Собрать под физическое устройство:
+Проверить, что путь реальный:
 
 ```powershell
+Test-Path "$env:ANDROID_NDK_HOME\source.properties"
+```
+
+Если команда вернула `False`, открой Android Studio и установи NDK через `SDK Manager -> SDK Tools -> NDK`.
+
+## 3. Собрать curl с HTTP/3
+
+Собрать ABI для физического устройства:
+
+```powershell
+cd C:\work\vcpkg
 .\vcpkg.exe install "curl[http3]:arm64-android"
 ```
 
-Собрать под emulator:
+Собрать ABI для emulator:
 
 ```powershell
 .\vcpkg.exe install "curl[http3]:x64-android"
 ```
 
-Импортировать в проект:
+Что делает `curl[http3]`: включает HTTP/3 через `ngtcp2`, `nghttp3` и OpenSSL. Это важно, потому что обычный `curl` без feature `http3` для этой задачи не подходит.
+
+Соответствие `vcpkg` triplet и Android ABI:
+
+```text
+arm64-android -> arm64-v8a
+x64-android   -> x86_64
+```
+
+## 4. Импортировать результат в проект
+
+Вернуться в корень проекта:
 
 ```powershell
 cd C:\Users\RED.DOT\AndroidStudioProjects\DexMVP
+```
+
+Импортировать обе сборки:
+
+```powershell
 .\scripts\import-curl-from-vcpkg.ps1 -VcpkgRoot C:\work\vcpkg
 ```
 
-Если собран пока только emulator ABI `x64-android`, импортировать так:
+Скрипт копирует:
+
+- headers из `installed\<triplet>\include`;
+- `libcurl.so`, если vcpkg собрал shared library;
+- `libcurl.a`, если vcpkg собрал static library;
+- остальные `.so` и `.a` зависимости из `lib` и `debug\lib`.
+
+Для этого проекта оба варианта нормальны: `libcurl.so` и `libcurl.a` поддерживаются в `native-http3/src/main/cpp/CMakeLists.txt`.
+
+Если нужен только emulator, можно импортировать только `x64-android`:
 
 ```powershell
 .\scripts\import-curl-from-vcpkg.ps1 `
-  -VcpkgRoot C:\Users\RED.DOT\Downloads\vcpkg-master\vcpkg-master `
+  -VcpkgRoot C:\work\vcpkg `
   -Triplets x64-android
 ```
 
-Проверить:
+## 5. Проверить layout
+
+Для полного набора ABI:
+
+```powershell
+.\scripts\check-curl-android-layout.ps1
+```
+
+Для emulator-only набора:
+
+```powershell
+.\scripts\check-curl-android-layout.ps1 -RequiredAbis x86_64
+```
+
+Ожидаемый результат: `OK: curl Android bundle layout is valid.`
+
+## 6. Проверить сборку native-http3 с curl
+
+Для полного набора ABI:
+
+```powershell
+.\scripts\verify-native-http3-curl.ps1
+```
+
+Для emulator-only набора:
+
+```powershell
+.\scripts\verify-native-http3-curl.ps1 -Abis x86_64
+```
+
+Скрипт включает:
+
+```text
+nativeHttp3.enableCmake=true
+nativeHttp3.enableCurl=true
+nativeHttp3.curlRootDir=<путь к third_party/curl-android>
+nativeHttp3.abis=<ABI list>
+```
+
+Если сборка прошла, проект собрал `native-http3` с реальным `libcurl`.
+
+## 7. Что переносить на закрытую машину
+
+После успешной проверки перенести вместе с проектом папку:
+
+```text
+third_party/curl-android
+```
+
+На закрытой машине проверить:
 
 ```powershell
 .\scripts\check-curl-android-layout.ps1
 .\scripts\verify-native-http3-curl.ps1
 ```
 
-Если в bundle есть только `x86_64`, проверять так:
+Если там есть только emulator ABI:
 
 ```powershell
 .\scripts\check-curl-android-layout.ps1 -RequiredAbis x86_64
 .\scripts\verify-native-http3-curl.ps1 -Abis x86_64
 ```
 
-## Если vcpkg собрал `.a`, а не `.so`
+## Частые проблемы
 
-Это нормальный результат для vcpkg Android.
+### `ANDROID_NDK_HOME` не задан
 
-Проект поддерживает оба варианта:
+Задать переменную в текущем PowerShell:
 
-```text
-libcurl.so
-libcurl.a
+```powershell
+$env:ANDROID_NDK_HOME="C:\path\to\Android\Sdk\ndk\<version>"
 ```
 
-Если есть `libcurl.a`, рядом должны быть статические зависимости:
+Для постоянной настройки:
+
+```powershell
+[Environment]::SetEnvironmentVariable("ANDROID_NDK_HOME", "C:\path\to\Android\Sdk\ndk\<version>", "User")
+```
+
+После этого открыть новый PowerShell.
+
+### vcpkg собрал `.a`, а не `.so`
+
+Это нормально. Android triplet в `vcpkg` часто дает static libraries. Проект поддерживает static `libcurl.a`, если рядом есть статические зависимости:
 
 ```text
 libngtcp2_crypto_ossl.a
@@ -143,50 +198,25 @@ libcrypto.a
 libz.a
 ```
 
-Скрипт `import-curl-from-vcpkg.ps1` копирует их автоматически.
+`import-curl-from-vcpkg.ps1` копирует эти файлы автоматически, если они есть в установленном triplet.
 
-Для static vcpkg build `native-http3` собирается с minSdk 26 в curl-enabled режиме. Это нужно, потому что часть Android fortified socket symbols, например `__sendto_chk`, есть в NDK libc начиная с API 26. Обычная сборка без curl остаётся на minSdk 24.
+### Ошибка по minSdk или fortified symbols
 
-## Почему нужен не обычный curl
+В curl-enabled режиме модуль `native-http3` использует `minSdk 26`. Это уже настроено в `native-http3/build.gradle.kts`. Обычная сборка без curl остается на `minSdk 24`.
 
-Нужен curl с HTTP/3.
+### Нужен не весь набор ABI
 
-Официальная документация curl говорит, что для HTTP/3 через `ngtcp2` нужны:
-
-- `ngtcp2`;
-- `nghttp3`;
-- TLS library с QUIC support.
-
-Также HTTP/3 в curl работает для `https://` URL, потому что HTTP/3 идёт поверх QUIC/TLS.
-
-## Что переносить на закрытый ПК
-
-После успешной проверки перенести:
-
-```text
-DexMVP/
-  third_party/curl-android/
-  docs/
-  scripts/
-  app/
-  feature/
-  native-http3/
-  remote-module/
-  server/
-```
-
-На закрытом ПК проверить:
+Для локальной проверки можно собирать только `x64-android` и запускать:
 
 ```powershell
-.\scripts\verify-project.ps1
-.\scripts\verify-native-http3.ps1
-.\scripts\check-curl-android-layout.ps1
-.\scripts\verify-native-http3-curl.ps1
+.\scripts\verify-native-http3-curl.ps1 -Abis x86_64
 ```
+
+Для физического устройства нужен `arm64-android` и ABI `arm64-v8a`.
 
 ## Источники
 
 - curl HTTP/3: https://curl.se/docs/http3.html
-- curl install/vcpkg: https://curl.se/docs/install.html
-- vcpkg Android triplets: https://learn.microsoft.com/en-us/vcpkg/users/platforms/android
+- curl install: https://curl.se/docs/install.html
+- vcpkg Android: https://learn.microsoft.com/en-us/vcpkg/users/platforms/android
 - vcpkg curl package: https://vcpkg.io/en/package/curl.html
