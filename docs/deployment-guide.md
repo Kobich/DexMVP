@@ -213,7 +213,7 @@ HTTP/3 поднимать только после успешного обычн�
 1. Проверить/import `third_party/curl-android`.
 2. Проверить NGINX HTTP/3 в WSL.
 3. Узнать текущий WSL IP.
-4. Сгенерировать local debug CA/server cert под текущий WSL IP.
+4. Настроить Caddy с доверенным server certificate без CA в APK.
 5. Запустить Ktor с `BaseUrl = https://CURRENT_WSL_IP:8443`.
 6. Проверить NGINX proxy.
 7. Собрать app с HTTP/3 flags.
@@ -331,7 +331,7 @@ Transport mode = HTTP/3 only
 ```text
 transport = libcurl HTTP/3 via JNI
 engine = libcurl/... ngtcp2/... nghttp3/...
-tls = enabled with local debug CA
+tls = enabled with default libcurl CA trust
 ```
 
 3. `Check -> Download -> Open` должны пройти именно в `HTTP/3 only`. В этом режиме OkHttp fallback не используется.
@@ -372,7 +372,7 @@ HTTP/3:
 - `.\scripts\check-curl-android-layout.ps1 -RequiredAbis x86_64` проходит.
 - `curl -k https://127.0.0.1:8443/health` из WSL отвечает.
 - App diagnostics показывает `libcurl HTTP/3 via JNI`.
-- TLS diagnostics показывает `enabled with local debug CA`.
+- TLS diagnostics показывает `enabled with default libcurl CA trust`.
 - В режиме `HTTP3_ONLY` проходят `Check`, `Download`, `Open`.
 
 ## 10. Если Что-то Сломалось
@@ -384,7 +384,7 @@ Gradle/SDK не собирается -> docs/closed-infra-runbook.md
 Ktor не отвечает -> scripts/run-server.ps1, scripts/check-server.ps1
 Check работает, Download нет -> проверить artifactUrl в manifest
 HTTP/3 не отвечает -> docs/http3-critical-handoff.md
-TLS curlCode=60 -> docs/http3-tls-guide.md
+TLS curlCode=60 -> docs/caddy-http3-tls-guide.md
 Remote class не грузится -> docs/architecture.md и feature/remote-execution/README.md
 ```
 
@@ -396,7 +396,7 @@ Remote class не грузится -> docs/architecture.md и feature/remote-exe
 - `docs/closed-infra-runbook.md` — перенос на закрытую машину.
 - `docs/http3-setup-guide.md` — детальный HTTP/3 setup.
 - `docs/http3-critical-handoff.md` — текущее рабочее состояние HTTP/3 и восстановление.
-- `docs/http3-tls-guide.md` — TLS/local CA.
+- `docs/caddy-http3-tls-guide.md` — Caddy HTTP/3 и TLS без CA в APK.
 - `docs/scripts-reference.md` — справочник скриптов.
 - `docs/architecture.md` — архитектура модулей.
 - `docs/code-map.md` — карта классов и файлов.

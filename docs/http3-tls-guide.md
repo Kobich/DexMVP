@@ -1,5 +1,7 @@
 # HTTP/3 TLS Guide
 
+Legacy note: это старый local-debug-CA сценарий. В ветке `release-caddy-http3` project-local CA убран из APK. Для текущего Caddy/default-trust пути использовать `docs/caddy-http3-tls-guide.md`.
+
 Цель: убрать локальный `verifyTls=false` и проверять self-signed NGINX certificate через локальный debug CA.
 
 ## Что Меняется

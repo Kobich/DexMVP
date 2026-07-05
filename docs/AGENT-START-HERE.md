@@ -34,13 +34,13 @@ Android host app
 3. `docs/architecture.md` — архитектура проекта.
 4. `docs/code-map.md` — карта кода.
 5. `docs/scripts-reference.md` — все helper scripts.
-6. `docs/http3-setup-guide.md` — последовательный HTTP/3 setup.
-7. `docs/http3-critical-handoff.md` — критичный текущий handoff HTTP/3.
+6. `docs/caddy-http3-tls-guide.md` — Caddy HTTP/3 setup без project-local CA в APK.
+7. `docs/http3-setup-guide.md` — legacy NGINX HTTP/3 setup.
 
 Если нужно восстановить текущий HTTP/3 стенд, начинать с:
 
 ```text
-docs/http3-critical-handoff.md
+docs/caddy-http3-tls-guide.md
 docs/http3-setup-guide.md
 ```
 
@@ -62,26 +62,25 @@ Ktor не является HTTP/3 server. HTTP/3 endpoint — NGINX в WSL.
 
 ## TLS Статус
 
-Локальный HTTP/3 transport переведён на CA-based TLS verification.
+Локальный HTTP/3 transport больше не кладёт project-local CA в APK.
 
-Подтверждено: `HTTP3_ONLY -> Check -> Download -> Open` работает с `verifyTls=true`.
+Текущая production-like модель: `verifyTls=true`, `caFilePath=""`, `CURLOPT_CAINFO` не задаётся.
 
 Схема:
 
 ```text
-local debug CA
-  -> app/src/debug/res/raw/dexmvp_local_ca.crt
+trusted server certificate
+  -> Caddy HTTPS/HTTP3 endpoint
   -> NativeHttp3Client
-  -> CURLOPT_CAINFO
-  -> NGINX server cert
+  -> libcurl/OpenSSL default trust
 ```
 
-Если CA ещё не сгенерирован, HTTP/3 режим покажет ошибку про `dexmvp_local_ca.crt`.
+Если текущий Android libcurl/OpenSSL не видит default CA trust, HTTP/3 режим упадёт на TLS verification. Это следующий реальный production-risk, а не повод возвращать CA в APK.
 
 Guide:
 
 ```text
-docs/http3-tls-guide.md
+docs/caddy-http3-tls-guide.md
 ```
 
 ## Базовые Проверки
@@ -158,9 +157,9 @@ curl -k https://127.0.0.1:8443/api/v1/modules/active
 
 ### `curlCode=60`
 
-TLS certificate не доверен или server cert выпущен не на текущий WSL IP.
+TLS certificate не доверен, server cert выпущен не на тот DNS host, или native libcurl/OpenSSL не видит default CA trust.
 
-Решение: выполнить `docs/http3-tls-guide.md` и пересобрать APK.
+Решение: проверить Caddy certificate chain, `Server URL`, DNS/SAN и `docs/caddy-http3-tls-guide.md`.
 
 Если в ошибке есть:
 

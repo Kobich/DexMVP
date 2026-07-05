@@ -28,17 +28,17 @@ object TransportDiagnosticsProvider {
             TransportMode.HTTP3_ONLY -> {
                 val configResult = runCatching { RemoteTransportFactory.localHttp3Config(context) }
                 val config = configResult.getOrNull()
-                val client = NativeHttp3Client(config ?: RemoteTransportFactory.localHttp3Config())
+                val client = NativeHttp3Client(config ?: com.engboost.nativehttp3.NativeHttp3Config())
                 TransportDiagnostics(
                     mode = mode,
                     transport = "libcurl HTTP/3 via JNI",
                     tlsVerification = if (config != null) {
-                        "enabled with local debug CA"
+                        "enabled with Caddy root CA"
                     } else {
                         "CA not configured: ${configResult.exceptionOrNull()?.message}"
                     },
                     nativeLayer = if (client.isNativeLayerLoaded()) "loaded" else "not loaded",
-                    caFilePath = config?.caFilePath.orEmpty(),
+                    caFilePath = config?.caFilePath?.ifBlank { "not set" }.orEmpty(),
                     engine = client.engineInfo(),
                 )
             }

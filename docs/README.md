@@ -24,6 +24,7 @@
 - `docs/deployment-guide.md`
 - `docs/http3-setup-guide.md`
 - `docs/nginx-http3-from-scratch.md`
+- `docs/caddy-http3-tls-guide.md`
 - `docs/http3-tls-guide.md`
 - `docs/http3-critical-handoff.md`
 
@@ -41,6 +42,7 @@
 Понять безопасность и ограничения:
 
 - `docs/security-notes.md`
+- `docs/production-tls-and-code-trust-guide.md`
 - `docs/http3-future-requirement.md`
 - `docs/possible-changes.md`
 
@@ -52,6 +54,7 @@
 - `docs/http3-curl-source-strategy.md` — почему нужен controlled curl bundle.
 - `docs/http3-libcurl-integration.md` — детали JNI/libcurl integration.
 - `docs/http3-current-state.md` — снимок состояния HTTP/3 стенда.
+- `docs/production-tls-and-code-trust-guide.md` — production-like TLS, CSR под IP и подпись remote manifest/artifact.
 - `docs/demo-script.md` — сценарий демонстрации.
 
 ## Самое Важное Для Переноса

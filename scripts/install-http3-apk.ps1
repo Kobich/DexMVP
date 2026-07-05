@@ -2,6 +2,9 @@ param(
     [ValidateSet("x86_64", "arm64-v8a")]
     [string]$Abi = "x86_64",
 
+    [ValidateSet("Debug", "Release")]
+    [string]$BuildType = "Debug",
+
     [switch]$Build
 )
 
@@ -16,12 +19,18 @@ if ((Get-Command adb -ErrorAction SilentlyContinue) -eq $null -and (Test-Path $p
 }
 
 if ($Build) {
-    & .\scripts\build-http3-apk.ps1 -Abi $Abi
+    & .\scripts\build-http3-apk.ps1 -Abi $Abi -BuildType $BuildType
 }
 
-$apk = Join-Path $repoRoot "app\build\outputs\apk\debug\app-debug.apk"
+$outputBuildType = $BuildType.ToLowerInvariant()
+$apkName = if ($BuildType -eq "Debug") { "app-debug.apk" } else { "app-release-unsigned.apk" }
+$apk = Join-Path $repoRoot "app\build\outputs\apk\$outputBuildType\$apkName"
 if (-not (Test-Path $apk)) {
-    throw "APK not found: $apk. Run .\scripts\build-http3-apk.ps1 first."
+    throw "APK not found: $apk. Run .\scripts\build-http3-apk.ps1 -BuildType $BuildType first."
+}
+
+if ($BuildType -eq "Release" -and $apkName.EndsWith("-unsigned.apk")) {
+    throw "Release APK is unsigned and cannot be installed directly: $apk. Add release signing config or install a signed artifact."
 }
 
 Write-Host "Installing APK..."

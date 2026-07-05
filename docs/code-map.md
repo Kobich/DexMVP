@@ -84,9 +84,11 @@ feature/remote-execution/impl/src/main/java/com/engboost/dexmvp/transport
 - `docs/http3-curl-source-strategy.md` - решение, откуда брать `libcurl` и почему не стоит тащить случайный `.so`.
 - `docs/http3-curl-build-guide.md` - пошаговая инструкция: получить approved bundle или собрать через vcpkg.
 - `docs/http3-current-state.md` - текущий статус HTTP/3 стенда, адреса, ограничения и следующие шаги.
-- `docs/http3-critical-handoff.md` - критичный handoff: HTTP/3 заработал, TLS через debug CA, как восстановить стенд.
+- `docs/http3-critical-handoff.md` - исторический handoff: HTTP/3 заработал, старый TLS-вариант был через debug CA.
 - `docs/http3-setup-guide.md` - последовательная установка HTTP/3 стенда Windows + WSL + Android.
-- `docs/http3-tls-guide.md` - локальный CA, NGINX server cert и Android/libcurl trust.
+- `docs/http3-tls-guide.md` - legacy local CA, NGINX server cert и Android/libcurl trust.
+- `docs/caddy-http3-tls-guide.md` - Caddy HTTP/3 endpoint на Windows без project-local CA в APK.
+- `docs/production-tls-and-code-trust-guide.md` - production-like TLS, CSR под IP и отдельная trust-модель для remote APK/DEX.
 - `docs/scripts-reference.md` - справочник всех helper scripts.
 - `scripts/import-curl-from-vcpkg.ps1` - копирует собранный vcpkg `curl[http3]` в `third_party/curl-android`.
 - `scripts/build-http3-apk.ps1` - собирает `app-debug.apk` с HTTP/3 curl flags под выбранный ABI.

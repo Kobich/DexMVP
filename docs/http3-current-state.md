@@ -81,24 +81,24 @@ http://10.0.2.2:8080
 
 ## TLS сейчас
 
-Локальный HTTP/3 transport переведён на проверку TLS через debug CA.
+Локальный HTTP/3 transport переведён на production-like TLS без project-local CA в APK.
 
 Схема:
 
 ```text
-app/src/debug/res/raw/dexmvp_local_ca.crt
-  -> NativeHttp3Client caFilePath
-  -> libcurl CURLOPT_CAINFO
-  -> NGINX server certificate
+trusted server certificate
+  -> Caddy HTTPS/HTTP3 endpoint
+  -> NativeHttp3Client caFilePath=""
+  -> libcurl/OpenSSL default trust
 ```
 
-Генерация CA/server cert:
+Основной Caddy/TLS guide:
 
 ```text
-docs/http3-tls-guide.md
+docs/caddy-http3-tls-guide.md
 ```
 
-Важно: это debug/local CA, не production PKI.
+Важно: если native libcurl/OpenSSL не видит default CA trust, TLS verification будет падать. Это следующий production-risk для проверки.
 
 ## Что проверено
 
@@ -122,7 +122,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-native-http3-curl.ps1
 ```
 
 - Главный экран app показывает `Transport Diagnostics`: mode, backend, TLS state, native layer, engine info.
-- HTTP/3 с `verifyTls=true` и local debug CA подтверждён как рабочий.
+- HTTP/3 с `verifyTls=true` теперь не использует CA resource из APK.
 - Известный troubleshooting: `sslVerifyResult=9` означает неверное время Android/emulator относительно `notBefore` certificate.
 
 ## Как собрать APK для HTTP/3 теста
@@ -148,7 +148,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-native-http3-curl.ps1
 ## Чего не хватает до полноценного решения
 
 - Надёжный запуск NGINX из проекта скриптами.
-- Генерация local debug CA/server cert есть, но production PKI ещё нет.
+- Project-local CA из APK убран; нужно проверить production/corporate CA trust для native libcurl.
 - Проверка UDP 8443 из Android до WSL.
 - Production TLS trust.
 - Отдельная Studio run configuration для HTTP/3.
@@ -159,4 +159,4 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-native-http3-curl.ps1
 
 1. Проверить HTTP/3 из Android с `HTTP3_ONLY`.
 2. Если нет подключения к `https://172.31.123.239:8443`, проверить UDP/Firewall/WSL networking.
-3. Для production заменить debug CA на доверенный cert/CA.
+3. Проверить Caddy с доверенным cert и default trust native libcurl/OpenSSL.

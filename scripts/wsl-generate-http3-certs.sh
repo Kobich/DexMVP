@@ -6,9 +6,9 @@ CERT_DIR="${CERT_DIR:-/etc/nginx/dexmvp/certs}"
 WSL_IP="${WSL_IP:-$(hostname -I | awk '{print $1}')}"
 
 ANDROID_CA_TARGET="$REPO_ROOT/app/src/debug/res/raw/dexmvp_local_ca.crt"
+COPY_ANDROID_CA="${COPY_ANDROID_CA:-0}"
 
 sudo mkdir -p "$CERT_DIR"
-mkdir -p "$(dirname "$ANDROID_CA_TARGET")"
 
 CA_KEY="$CERT_DIR/dexmvp-local-ca.key"
 CA_CERT="$CERT_DIR/dexmvp-local-ca.crt"
@@ -68,12 +68,19 @@ sudo openssl x509 -req \
   -extensions v3_req \
   -extfile "$SERVER_CONFIG"
 
-sudo cp "$CA_CERT" "$ANDROID_CA_TARGET"
-sudo chown "$(id -u):$(id -g)" "$ANDROID_CA_TARGET"
+if [ "$COPY_ANDROID_CA" = "1" ]; then
+  mkdir -p "$(dirname "$ANDROID_CA_TARGET")"
+  sudo cp "$CA_CERT" "$ANDROID_CA_TARGET"
+  sudo chown "$(id -u):$(id -g)" "$ANDROID_CA_TARGET"
+fi
 
 echo ""
 echo "OK: certificates generated."
 echo "WSL IP: $WSL_IP"
 echo "NGINX ssl_certificate: $SERVER_CERT"
 echo "NGINX ssl_certificate_key: $SERVER_KEY"
-echo "Android debug CA: $ANDROID_CA_TARGET"
+if [ "$COPY_ANDROID_CA" = "1" ]; then
+  echo "Android debug CA: $ANDROID_CA_TARGET"
+else
+  echo "Android debug CA: not copied. Set COPY_ANDROID_CA=1 only for legacy debug-CA APKs."
+fi

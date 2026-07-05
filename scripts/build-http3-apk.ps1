@@ -2,6 +2,9 @@ param(
     [ValidateSet("x86_64", "arm64-v8a")]
     [string]$Abi = "x86_64",
 
+    [ValidateSet("Debug", "Release")]
+    [string]$BuildType = "Debug",
+
     [string]$CurlRootDir = ".\third_party\curl-android"
 )
 
@@ -20,11 +23,14 @@ if (((-not $env:JAVA_HOME) -or (-not (Test-Path "$env:JAVA_HOME\bin\java.exe")) 
     $env:Path = "$env:JAVA_HOME\bin;$env:Path"
 }
 
-Write-Host "Building app debug APK with native HTTP/3 enabled..."
+$gradleTask = ":app:assemble$BuildType"
+$outputBuildType = $BuildType.ToLowerInvariant()
+
+Write-Host "Building app $BuildType APK with native HTTP/3 enabled..."
 Write-Host "abi=$Abi"
 Write-Host "curlRootDir=$resolvedCurlRoot"
 
-& .\gradlew.bat :app:assembleDebug `
+& .\gradlew.bat $gradleTask `
     "-PnativeHttp3.enableCmake=true" `
     "-PnativeHttp3.enableCurl=true" `
     "-PnativeHttp3.curlRootDir=$resolvedCurlRoot" `
@@ -35,4 +41,4 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "OK: HTTP/3 APK built."
-Write-Host "APK: app\build\outputs\apk\debug\app-debug.apk"
+Write-Host "APK directory: app\build\outputs\apk\$outputBuildType"

@@ -24,7 +24,7 @@ feature:remote-execution:impl
 - CMake подключается только при Gradle-флаге `nativeHttp3.enableCmake=true`;
 - curl backend подключается только при Gradle-флаге `nativeHttp3.enableCurl=true`;
 - JNI методы `nativeEngineInfo()`, `nativeGetString()` и `nativeDownload()` вызывают libcurl;
-- TLS verification включён, local debug CA передаётся в libcurl через `CURLOPT_CAINFO`;
+- TLS verification включён; `CAINFO` по умолчанию пустой, поэтому transport полагается на default trust libcurl/OpenSSL;
 - без native/curl flags обычная сборка и Gradle sync остаются рабочими.
 
 Подтверждённый локальный сценарий:

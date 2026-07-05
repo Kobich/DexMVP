@@ -17,6 +17,9 @@ object RemoteTransportFactory {
     }
 
     private fun localHttp3Transport(context: Context?): Http3RemoteTransport {
+        require(context != null) {
+            "Context is required for HTTP/3 transport because libcurl needs the bundled Caddy root CA."
+        }
         return Http3RemoteTransport(
             client = NativeHttp3Client(
                 localHttp3Config(context),
@@ -24,13 +27,12 @@ object RemoteTransportFactory {
         )
     }
 
-    fun localHttp3Config(context: Context? = null): NativeHttp3Config {
-        val caFilePath = context?.let(LocalDebugCaProvider::prepareCaFile).orEmpty()
+    fun localHttp3Config(context: Context): NativeHttp3Config {
         return NativeHttp3Config(
             15_000,
             30_000,
             true,
-            caFilePath,
+            CaddyCaProvider.prepareCaFile(context),
         )
     }
 }

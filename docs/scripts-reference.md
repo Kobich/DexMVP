@@ -126,7 +126,7 @@ HTTP/3 через NGINX WSL:
 
 ### `scripts/wsl-generate-http3-certs.sh`
 
-WSL script. Генерирует локальный CA, выпускает NGINX server cert под текущий WSL IP и копирует CA в Android debug resources.
+WSL script. Генерирует локальный CA и выпускает server cert под указанный IP. По умолчанию CA больше не копируется в Android resources.
 
 Выполнять из WSL:
 
@@ -135,9 +135,15 @@ cd /mnt/c/Users/RED.DOT/AndroidStudioProjects/DexMVP
 bash ./scripts/wsl-generate-http3-certs.sh
 ```
 
+Legacy debug-CA APK режим включается только явно:
+
+```bash
+COPY_ANDROID_CA=1 bash ./scripts/wsl-generate-http3-certs.sh
+```
+
 ### `scripts/build-http3-apk.ps1`
 
-Собирает `app-debug.apk` с HTTP/3 flags.
+Собирает app APK с HTTP/3 flags. По умолчанию собирает `Debug`.
 
 Emulator:
 
@@ -150,6 +156,14 @@ Physical device:
 ```powershell
 .\scripts\build-http3-apk.ps1 -Abi arm64-v8a
 ```
+
+Production-like release artifact:
+
+```powershell
+.\scripts\build-http3-apk.ps1 -Abi x86_64 -BuildType Release
+```
+
+Release APK без signing config будет unsigned и не устанавливается напрямую.
 
 ### `scripts/install-http3-apk.ps1`
 
@@ -164,3 +178,5 @@ Physical device:
 ```powershell
 .\scripts\install-http3-apk.ps1 -Build -Abi x86_64
 ```
+
+Release install поддержан только для подписанного release APK. Если Gradle собрал `app-release-unsigned.apk`, скрипт остановится с понятной ошибкой.
