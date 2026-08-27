@@ -367,7 +367,7 @@ private fun RemoteFeatureScreen(
 
             if (composeFeature != null) {
                 RemoteComposeErrorBoundary(
-                    errorKey = feature?.id,
+                    resetKey = feature?.id,
                     onError = onRemoteError,
                     fallback = { error ->
                         ErrorCard(error.message ?: error.toString())
