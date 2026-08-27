@@ -1,9 +1,8 @@
 package com.engboost.dexmvp.remoteexecution.ui
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,7 +39,6 @@ import com.engboost.dexmvp.transport.TransportDiagnostics
 import com.engboost.dexmvp.transport.TransportDiagnosticsProvider
 import com.engboost.dexmvp.transport.RemoteTransportFactory
 import com.engboost.dexmvp.transport.TransportMode
-import com.engboost.remoteapi.RemoteComposeFeature
 import com.engboost.remoteapi.RemoteEvent
 import com.engboost.remoteapi.RemoteFeatureKind
 import com.engboost.remoteapi.RemoteHost
@@ -61,7 +59,6 @@ private data class RemoteExecutionDemoState(
     val manifest: RemoteModuleManifest? = null,
     val artifactPath: String? = null,
     val selectedFeature: RemoteFeatureManifest? = null,
-    val composeFeature: RemoteComposeFeature? = null,
     val resultTitle: String? = null,
     val resultMessage: String? = null,
     val error: String? = null,
@@ -70,11 +67,9 @@ private data class RemoteExecutionDemoState(
 
 @Composable
 fun RemoteExecutionDemoScreen() {
-    val localContext = LocalContext.current
-    val context = localContext.applicationContext
-    val activity = remember(localContext) { localContext.findActivity() }
+    val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
-    var state by remember { mutableStateOf(initialDemoState()) }
+    var state by remember { mutableStateOf(RemoteExecutionDemoState()) }
 
     fun appendEvent(message: String) {
         state = state.copy(events = (listOf(message) + state.events).take(10))
@@ -84,30 +79,10 @@ fun RemoteExecutionDemoScreen() {
         state = state.copy(
             route = RemoteExecutionRoute.Home,
             selectedFeature = null,
-            composeFeature = null,
             resultTitle = null,
             resultMessage = null,
         )
         appendEvent("Back to feature list")
-    }
-
-    fun handleRemoteError(error: Throwable) {
-        val message = error.message ?: error.toString()
-        if (activity != null) {
-            RemoteComposeFailureRecovery.record(message)
-            activity.recreate()
-            return
-        }
-
-        state = state.copy(
-            route = RemoteExecutionRoute.Home,
-            selectedFeature = null,
-            composeFeature = null,
-            resultTitle = null,
-            resultMessage = null,
-            error = message,
-        )
-        appendEvent("Remote Compose failed: $message")
     }
 
     fun repository(): RemoteModuleRepository {
@@ -140,6 +115,20 @@ fun RemoteExecutionDemoScreen() {
         }
     }
 
+    val remoteComposeLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        val errorMessage = result.data
+            ?.getStringExtra(RemoteComposeActivityContract.EXTRA_ERROR_MESSAGE)
+
+        if (errorMessage == null) {
+            appendEvent("Remote Compose closed")
+        } else {
+            state = state.copy(error = errorMessage)
+            appendEvent("Remote Compose failed: $errorMessage")
+        }
+    }
+
     BackHandler(enabled = state.route is RemoteExecutionRoute.Feature) {
         navigateHome()
     }
@@ -156,7 +145,6 @@ fun RemoteExecutionDemoScreen() {
                         state.copy(
                             manifest = manifest,
                             selectedFeature = null,
-                            composeFeature = null,
                             resultTitle = null,
                             resultMessage = null,
                         )
@@ -176,10 +164,23 @@ fun RemoteExecutionDemoScreen() {
                         val artifact = File(artifactPath)
                         if (feature.kind == RemoteFeatureKind.COMPOSE) {
                             val composeFeature = repository().loadCompose(manifest, feature, artifact)
+                            val sessionId = RemoteComposeSessionStore.create(
+                                title = feature.title,
+                                feature = composeFeature,
+                                input = demoInput(),
+                                host = remoteHost,
+                            )
+                            try {
+                                remoteComposeLauncher.launch(
+                                    RemoteComposeActivityContract.createIntent(context, sessionId),
+                                )
+                            } catch (error: Throwable) {
+                                RemoteComposeSessionStore.discard(sessionId)
+                                throw error
+                            }
+
                             state.copy(
-                                route = RemoteExecutionRoute.Feature(feature.title),
-                                selectedFeature = feature,
-                                composeFeature = composeFeature,
+                                selectedFeature = null,
                                 resultTitle = null,
                                 resultMessage = null,
                             )
@@ -193,7 +194,6 @@ fun RemoteExecutionDemoScreen() {
                             state.copy(
                                 route = RemoteExecutionRoute.Feature(feature.title),
                                 selectedFeature = feature,
-                                composeFeature = null,
                                 resultTitle = output.title,
                                 resultMessage = output.message,
                             )
@@ -207,12 +207,9 @@ fun RemoteExecutionDemoScreen() {
             RemoteFeatureScreen(
                 title = route.title,
                 feature = state.selectedFeature,
-                composeFeature = state.composeFeature,
                 resultTitle = state.resultTitle,
                 resultMessage = state.resultMessage,
                 events = state.events,
-                host = remoteHost,
-                onRemoteError = ::handleRemoteError,
                 onBack = ::navigateHome,
             )
         }
@@ -357,12 +354,9 @@ private fun TransportModeCard(
 private fun RemoteFeatureScreen(
     title: String,
     feature: RemoteFeatureManifest?,
-    composeFeature: RemoteComposeFeature?,
     resultTitle: String?,
     resultMessage: String?,
     events: List<String>,
-    host: RemoteHost,
-    onRemoteError: (Throwable) -> Unit,
     onBack: () -> Unit,
 ) {
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
@@ -394,16 +388,7 @@ private fun RemoteFeatureScreen(
                 }
             }
 
-            if (composeFeature != null) {
-                RemoteComposeErrorBoundary(
-                    resetKey = feature?.id,
-                    onError = onRemoteError,
-                ) {
-                    RemoteComposeContent(feature = composeFeature, host = host)
-                }
-            } else {
-                ResultCard(resultTitle, resultMessage)
-            }
+            ResultCard(resultTitle, resultMessage)
 
             EventLogCard(events)
         }
@@ -415,24 +400,6 @@ private fun demoInput(): RemoteInput {
         text = "Host call from DexMVP",
         timestampMillis = System.currentTimeMillis(),
     )
-}
-
-private fun initialDemoState(): RemoteExecutionDemoState {
-    val recoveredError = RemoteComposeFailureRecovery.consume()
-        ?: return RemoteExecutionDemoState()
-
-    return RemoteExecutionDemoState(
-        error = recoveredError,
-        events = listOf("Remote Compose failed: $recoveredError", "Ready"),
-    )
-}
-
-private tailrec fun Context.findActivity(): Activity? {
-    return when (this) {
-        is Activity -> this
-        is ContextWrapper -> baseContext.findActivity()
-        else -> null
-    }
 }
 
 @Composable
@@ -501,14 +468,6 @@ private fun FeatureListCard(
             }
         }
     }
-}
-
-@Composable
-private fun RemoteComposeContent(
-    feature: RemoteComposeFeature,
-    host: RemoteHost,
-) {
-    feature.Content(input = demoInput(), host = host)
 }
 
 @Composable

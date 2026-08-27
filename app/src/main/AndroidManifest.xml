@@ -16,6 +16,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.DexMVP">
         <activity
+            android:name=".RemoteComposeActivity"
+            android:exported="false"
+            android:theme="@style/Theme.DexMVP" />
+
+        <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"

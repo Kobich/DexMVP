@@ -11,7 +11,7 @@ import androidx.compose.ui.layout.SubcomposeLayout
 import java.util.concurrent.CancellationException
 
 @Composable
-internal fun RemoteComposeErrorBoundary(
+fun RemoteComposeErrorBoundary(
     resetKey: Any?,
     onError: (Throwable) -> Unit,
     content: @Composable () -> Unit,
@@ -65,18 +65,6 @@ internal fun RemoteComposeErrorBoundary(
 private object ContentSlot
 
 private const val LogTag = "RemoteComposeBoundary"
-
-internal object RemoteComposeFailureRecovery {
-    private var pendingMessage: String? = null
-
-    fun record(message: String) {
-        pendingMessage = message
-    }
-
-    fun consume(): String? {
-        return pendingMessage.also { pendingMessage = null }
-    }
-}
 
 private class FailureGate {
     private var closed = false

@@ -40,6 +40,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":feature:remote-execution:api"))
     implementation(project(":feature:remote-execution:impl"))
 
     implementation(libs.androidx.core.ktx)
