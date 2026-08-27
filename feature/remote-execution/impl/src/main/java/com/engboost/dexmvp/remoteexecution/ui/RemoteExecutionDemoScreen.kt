@@ -172,6 +172,9 @@ fun RemoteExecutionDemoScreen() {
                 resultMessage = state.resultMessage,
                 events = state.events,
                 host = remoteHost,
+                onRemoteError = { error ->
+                    appendEvent("Remote Compose failed: ${error.message ?: error.toString()}")
+                },
                 onBack = {
                     state = state.copy(
                         route = RemoteExecutionRoute.Home,
@@ -330,6 +333,7 @@ private fun RemoteFeatureScreen(
     resultMessage: String?,
     events: List<String>,
     host: RemoteHost,
+    onRemoteError: (Throwable) -> Unit,
     onBack: () -> Unit,
 ) {
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
@@ -362,7 +366,15 @@ private fun RemoteFeatureScreen(
             }
 
             if (composeFeature != null) {
-                RemoteComposeContent(feature = composeFeature, host = host)
+                RemoteComposeErrorBoundary(
+                    errorKey = feature?.id,
+                    onError = onRemoteError,
+                    fallback = { error ->
+                        ErrorCard(error.message ?: error.toString())
+                    },
+                ) {
+                    RemoteComposeContent(feature = composeFeature, host = host)
+                }
             } else {
                 ResultCard(resultTitle, resultMessage)
             }
