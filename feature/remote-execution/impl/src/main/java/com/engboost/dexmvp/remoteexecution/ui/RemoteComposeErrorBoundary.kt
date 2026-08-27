@@ -1,12 +1,13 @@
 package com.engboost.dexmvp.remoteexecution.ui
 
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.layout.SubcomposeLayout
-import androidx.compose.ui.platform.LocalView
 import java.util.concurrent.CancellationException
 
 @Composable
@@ -17,13 +18,13 @@ internal fun RemoteComposeErrorBoundary(
 ) {
     val currentOnError by rememberUpdatedState(onError)
     val failureGate = remember(resetKey) { FailureGate() }
-    val hostView = LocalView.current
+    val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
     fun reportFailure(throwable: Throwable) {
         throwable.rethrowIfFatal()
         if (failureGate.close()) {
             Log.e(LogTag, "Remote Compose failed", throwable)
-            hostView.post {
+            mainHandler.post {
                 currentOnError(throwable)
             }
         }
@@ -64,6 +65,18 @@ internal fun RemoteComposeErrorBoundary(
 private object ContentSlot
 
 private const val LogTag = "RemoteComposeBoundary"
+
+internal object RemoteComposeFailureRecovery {
+    private var pendingMessage: String? = null
+
+    fun record(message: String) {
+        pendingMessage = message
+    }
+
+    fun consume(): String? {
+        return pendingMessage.also { pendingMessage = null }
+    }
+}
 
 private class FailureGate {
     private var closed = false

@@ -1,5 +1,8 @@
 package com.engboost.dexmvp.remoteexecution.ui
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -67,9 +70,11 @@ private data class RemoteExecutionDemoState(
 
 @Composable
 fun RemoteExecutionDemoScreen() {
-    val context = LocalContext.current.applicationContext
+    val localContext = LocalContext.current
+    val context = localContext.applicationContext
+    val activity = remember(localContext) { localContext.findActivity() }
     val scope = rememberCoroutineScope()
-    var state by remember { mutableStateOf(RemoteExecutionDemoState()) }
+    var state by remember { mutableStateOf(initialDemoState()) }
 
     fun appendEvent(message: String) {
         state = state.copy(events = (listOf(message) + state.events).take(10))
@@ -88,6 +93,12 @@ fun RemoteExecutionDemoScreen() {
 
     fun handleRemoteError(error: Throwable) {
         val message = error.message ?: error.toString()
+        if (activity != null) {
+            RemoteComposeFailureRecovery.record(message)
+            activity.recreate()
+            return
+        }
+
         state = state.copy(
             route = RemoteExecutionRoute.Home,
             selectedFeature = null,
@@ -404,6 +415,24 @@ private fun demoInput(): RemoteInput {
         text = "Host call from DexMVP",
         timestampMillis = System.currentTimeMillis(),
     )
+}
+
+private fun initialDemoState(): RemoteExecutionDemoState {
+    val recoveredError = RemoteComposeFailureRecovery.consume()
+        ?: return RemoteExecutionDemoState()
+
+    return RemoteExecutionDemoState(
+        error = recoveredError,
+        events = listOf("Remote Compose failed: $recoveredError", "Ready"),
+    )
+}
+
+private tailrec fun Context.findActivity(): Activity? {
+    return when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.findActivity()
+        else -> null
+    }
 }
 
 @Composable
