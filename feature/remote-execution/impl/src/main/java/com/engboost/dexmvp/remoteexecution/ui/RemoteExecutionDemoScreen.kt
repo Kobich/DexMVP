@@ -86,6 +86,19 @@ fun RemoteExecutionDemoScreen() {
         appendEvent("Back to feature list")
     }
 
+    fun handleRemoteError(error: Throwable) {
+        val message = error.message ?: error.toString()
+        state = state.copy(
+            route = RemoteExecutionRoute.Home,
+            selectedFeature = null,
+            composeFeature = null,
+            resultTitle = null,
+            resultMessage = null,
+            error = message,
+        )
+        appendEvent("Remote Compose failed: $message")
+    }
+
     fun repository(): RemoteModuleRepository {
         return RemoteModuleRepository(
             context = context,
@@ -188,9 +201,7 @@ fun RemoteExecutionDemoScreen() {
                 resultMessage = state.resultMessage,
                 events = state.events,
                 host = remoteHost,
-                onRemoteError = { error ->
-                    appendEvent("Remote Compose failed: ${error.message ?: error.toString()}")
-                },
+                onRemoteError = ::handleRemoteError,
                 onBack = ::navigateHome,
             )
         }
@@ -376,9 +387,6 @@ private fun RemoteFeatureScreen(
                 RemoteComposeErrorBoundary(
                     resetKey = feature?.id,
                     onError = onRemoteError,
-                    fallback = { error ->
-                        ErrorCard(error.message ?: error.toString())
-                    },
                 ) {
                     RemoteComposeContent(feature = composeFeature, host = host)
                 }

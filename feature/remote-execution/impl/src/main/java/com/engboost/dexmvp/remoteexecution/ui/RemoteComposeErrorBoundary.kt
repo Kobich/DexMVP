@@ -1,40 +1,32 @@
 package com.engboost.dexmvp.remoteexecution.ui
 
+import android.util.Log
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.platform.LocalView
 import java.util.concurrent.CancellationException
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.yield
 
 @Composable
 internal fun RemoteComposeErrorBoundary(
     resetKey: Any?,
     onError: (Throwable) -> Unit,
-    fallback: @Composable (Throwable) -> Unit,
     content: @Composable () -> Unit,
 ) {
-    var capturedError by remember(resetKey) { mutableStateOf<Throwable?>(null) }
     val currentOnError by rememberUpdatedState(onError)
-    val errorEvents = remember(resetKey) { Channel<Throwable>(Channel.CONFLATED) }
+    val failureGate = remember(resetKey) { FailureGate() }
+    val hostView = LocalView.current
 
-    LaunchedEffect(errorEvents) {
-        for (error in errorEvents) {
-            yield()
-            capturedError = error
-            currentOnError(error)
+    fun reportFailure(throwable: Throwable) {
+        throwable.rethrowIfFatal()
+        if (failureGate.close()) {
+            Log.e(LogTag, "Remote Compose failed", throwable)
+            hostView.post {
+                currentOnError(throwable)
+            }
         }
-    }
-
-    val currentError = capturedError
-    if (currentError != null) {
-        fallback(currentError)
-        return
     }
 
     SubcomposeLayout { constraints ->
@@ -43,13 +35,8 @@ internal fun RemoteComposeErrorBoundary(
                 measurable.measure(constraints)
             }
         } catch (throwable: Throwable) {
-            throwable.rethrowIfFatal()
-            errorEvents.trySend(throwable)
-            subcompose(FallbackSlot) {
-                fallback(throwable)
-            }.map { measurable ->
-                measurable.measure(constraints)
-            }
+            reportFailure(throwable)
+            emptyList()
         }
 
         val width = (placeables.maxOfOrNull { it.width } ?: 0)
@@ -68,8 +55,7 @@ internal fun RemoteComposeErrorBoundary(
                     y = y.saturatingAdd(placeable.height)
                 }
             } catch (throwable: Throwable) {
-                throwable.rethrowIfFatal()
-                errorEvents.trySend(throwable)
+                reportFailure(throwable)
             }
         }
     }
@@ -77,7 +63,19 @@ internal fun RemoteComposeErrorBoundary(
 
 private object ContentSlot
 
-private object FallbackSlot
+private const val LogTag = "RemoteComposeBoundary"
+
+private class FailureGate {
+    private var closed = false
+
+    fun close(): Boolean {
+        if (closed) {
+            return false
+        }
+        closed = true
+        return true
+    }
+}
 
 private fun Throwable.rethrowIfFatal() {
     if (this is CancellationException || this is ThreadDeath || this is VirtualMachineError) {
