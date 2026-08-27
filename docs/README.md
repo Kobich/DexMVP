@@ -31,6 +31,7 @@
 Понять архитектуру:
 
 - `docs/architecture.md`
+- `docs/client-plugin-architecture.md` — краткая схема client/plugin-границ
 - `docs/code-map.md`
 - `docs/system-flow.md`
 
