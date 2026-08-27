@@ -1,5 +1,6 @@
 package com.engboost.dexmvp.remoteexecution.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -74,6 +75,17 @@ fun RemoteExecutionDemoScreen() {
         state = state.copy(events = (listOf(message) + state.events).take(10))
     }
 
+    fun navigateHome() {
+        state = state.copy(
+            route = RemoteExecutionRoute.Home,
+            selectedFeature = null,
+            composeFeature = null,
+            resultTitle = null,
+            resultMessage = null,
+        )
+        appendEvent("Back to feature list")
+    }
+
     fun repository(): RemoteModuleRepository {
         return RemoteModuleRepository(
             context = context,
@@ -102,6 +114,10 @@ fun RemoteExecutionDemoScreen() {
                 appendEvent("${event.type}: ${event.message}")
             }
         }
+    }
+
+    BackHandler(enabled = state.route is RemoteExecutionRoute.Feature) {
+        navigateHome()
     }
 
     when (val route = state.route) {
@@ -175,16 +191,7 @@ fun RemoteExecutionDemoScreen() {
                 onRemoteError = { error ->
                     appendEvent("Remote Compose failed: ${error.message ?: error.toString()}")
                 },
-                onBack = {
-                    state = state.copy(
-                        route = RemoteExecutionRoute.Home,
-                        selectedFeature = null,
-                        composeFeature = null,
-                        resultTitle = null,
-                        resultMessage = null,
-                    )
-                    appendEvent("Back to feature list")
-                },
+                onBack = ::navigateHome,
             )
         }
     }

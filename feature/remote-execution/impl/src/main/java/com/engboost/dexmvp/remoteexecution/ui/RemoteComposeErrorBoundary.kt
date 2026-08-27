@@ -9,6 +9,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.layout.SubcomposeLayout
 import java.util.concurrent.CancellationException
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.yield
 
 @Composable
 internal fun RemoteComposeErrorBoundary(
@@ -19,12 +21,18 @@ internal fun RemoteComposeErrorBoundary(
 ) {
     var capturedError by remember(resetKey) { mutableStateOf<Throwable?>(null) }
     val currentOnError by rememberUpdatedState(onError)
+    val errorEvents = remember(resetKey) { Channel<Throwable>(Channel.CONFLATED) }
+
+    LaunchedEffect(errorEvents) {
+        for (error in errorEvents) {
+            yield()
+            capturedError = error
+            currentOnError(error)
+        }
+    }
 
     val currentError = capturedError
     if (currentError != null) {
-        LaunchedEffect(currentError) {
-            currentOnError(currentError)
-        }
         fallback(currentError)
         return
     }
@@ -36,7 +44,7 @@ internal fun RemoteComposeErrorBoundary(
             }
         } catch (throwable: Throwable) {
             throwable.rethrowIfFatal()
-            capturedError = throwable
+            errorEvents.trySend(throwable)
             subcompose(FallbackSlot) {
                 fallback(throwable)
             }.map { measurable ->
@@ -61,7 +69,7 @@ internal fun RemoteComposeErrorBoundary(
                 }
             } catch (throwable: Throwable) {
                 throwable.rethrowIfFatal()
-                capturedError = throwable
+                errorEvents.trySend(throwable)
             }
         }
     }
