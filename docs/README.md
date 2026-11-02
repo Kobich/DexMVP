@@ -51,8 +51,7 @@
 
 Эти файлы не являются стартовой инструкцией. Открывать только если нужна конкретная деталь:
 
-- `docs/libcurl-android-build-ubuntu.md` — актуальная пошаговая сборка libcurl HTTP/3 в Ubuntu/WSL (NDK 30, API 23).
-- `docs/http3-curl-build-guide.md` — старая сборка curl HTTP/3 через vcpkg на Windows.
+- `docs/http3-curl-build-guide.md` — сборка curl HTTP/3 через vcpkg.
 - `docs/http3-curl-source-strategy.md` — почему нужен controlled curl bundle.
 - `docs/http3-libcurl-integration.md` — детали JNI/libcurl integration.
 - `docs/http3-current-state.md` — снимок состояния HTTP/3 стенда.

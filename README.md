@@ -11,36 +11,14 @@ Host-приложение получает manifest активного remote-м
 - Remote APK компилируется отдельно и может содержать несколько entry point: output-фичи и Compose-фичи.
 - Ktor server отдает manifest и APK-артефакт.
 - UI показывает этапы `Check`, `Download`, `Run`, ошибки, manifest и результат выполнения remote-кода.
-- Сетевой транспорт выбирается в UI: обычный HTTP через OkHttp или HTTP/3 (QUIC) через нативную libcurl по JNI.
 
 ## Модули
 
 - `app` - Android Compose host-приложение.
 - `feature:remote-execution:api` - общий контракт host и remote-модуля.
 - `feature:remote-execution:impl` - UI демо, загрузка manifest, скачивание APK, SHA-256, internal storage, `DexClassLoader`.
-- `native-http3` - JNI-обёртка (C++) над libcurl с HTTP/3: `NativeHttp3Client`.
 - `remote-module` - demo APK с output-фичей и несколькими Compose-фичами.
 - `server` - Ktor server с endpoints manifest/artifact.
-- `third_party/curl-android` - готовые статические библиотеки libcurl + ngtcp2 + nghttp3 + OpenSSL + zlib для `arm64-v8a` и `x86_64`.
-
-## Сетевой транспорт
-
-Интерфейс `RemoteTransport` (`feature:remote-execution:impl`, пакет `transport`) имеет три режима (`TransportMode`):
-
-| Режим | Как работает |
-|---|---|
-| `HTTP fallback` | OkHttp, обычный HTTP/1.1 |
-| `HTTP/3 preferred` | libcurl HTTP/3, при ошибке — OkHttp |
-| `HTTP/3 only` | только libcurl HTTP/3 (`CURL_HTTP_VERSION_3ONLY`) |
-
-Цепочка HTTP/3:
-
-```text
-Http3RemoteTransport -> NativeHttp3Client (Java) -> JNI -> native_http3_client.cpp
-  -> libcurl -> ngtcp2 (QUIC) + nghttp3 (HTTP/3) + OpenSSL (TLS 1.3)
-```
-
-Ktor сам HTTP/3 не отдаёт. Для HTTP/3 перед ним нужен reverse proxy с QUIC (в стенде — Caddy или NGINX на `:8443`). HTTP/3 работает только по `https://`, адрес может быть как IP, так и доменным именем; сертификат сервера должен содержать этот IP/имя.
 
 ## Быстрый запуск
 
@@ -74,19 +52,6 @@ http://10.0.2.2:8080
 Check -> Download -> Open
 ```
 
-## Сборка с HTTP/3
-
-Без флагов проект собирается без нативной части (только OkHttp). Сборка APK с libcurl HTTP/3:
-
-```powershell
-.\scripts\build-http3-apk.ps1 -Abi x86_64      # эмулятор
-.\scripts\build-http3-apk.ps1 -Abi arm64-v8a   # устройство
-```
-
-Скрипт передаёт в Gradle `-PnativeHttp3.enableCmake=true -PnativeHttp3.enableCurl=true -PnativeHttp3.curlRootDir=... -PnativeHttp3.abis=...`.
-
-Пересборка `third_party/curl-android` из исходников (Ubuntu/WSL, vcpkg, NDK 30.0.16248370, API 23): [docs/libcurl-android-build-ubuntu.md](docs/libcurl-android-build-ubuntu.md).
-
 ## Запуск на физическом устройстве
 
 Если приложение запускается на реальном телефоне, `10.0.2.2` не подойдет. Нужно указать IP компьютера в локальной сети:
@@ -111,7 +76,6 @@ http://YOUR_HOST_IP:8080
 ## Документация
 
 - [Deployment Guide](docs/deployment-guide.md)
-- [Сборка libcurl HTTP/3 для Android (Ubuntu)](docs/libcurl-android-build-ubuntu.md)
 - [Документация: индекс](docs/README.md)
 - [Agent Start Here](docs/AGENT-START-HERE.md)
 
