@@ -4,7 +4,7 @@
 
 ```
 NDK:  30.0.16248370 (r30)  — такой же должен стоять в Android Studio
-API:  36 (minSdk = targetSdk = 36)
+API:  23 для нативных библиотек (= minSdk 23); targetSdk 36 на сборку libcurl не влияет
 ABI:  arm64-v8a (устройства), x86_64 (эмулятор)
 libcurl + ngtcp2 + nghttp3 + nghttp2 + OpenSSL + zlib, всё статически, только release
 ```
@@ -49,8 +49,8 @@ echo "export ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> ~/.bashrc
 grep Pkg.Revision $ANDROID_NDK_HOME/source.properties
 # должно быть: Pkg.Revision = 30.0.16248370
 
-ls $ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/ | grep 36
-# должно вывести: 36
+cat $ANDROID_NDK_HOME/meta/platforms.json
+# "min" должен быть <= 23, иначе этот NDK не умеет собирать под minSdk 23
 ```
 
 ## 3. vcpkg
@@ -61,31 +61,31 @@ cd ~/vcpkg
 ./bootstrap-vcpkg.sh -disableMetrics
 ```
 
-## 4. Триплеты под API 36
+## 4. Триплеты под API 23
 
 ```bash
 mkdir -p ~/triplets
 
-cat > ~/triplets/arm64-android-36.cmake <<'EOF'
+cat > ~/triplets/arm64-android-23.cmake <<'EOF'
 set(VCPKG_TARGET_ARCHITECTURE arm64)
 set(VCPKG_CRT_LINKAGE dynamic)
 set(VCPKG_LIBRARY_LINKAGE static)
 set(VCPKG_BUILD_TYPE release)
 set(VCPKG_CMAKE_SYSTEM_NAME Android)
-set(VCPKG_CMAKE_SYSTEM_VERSION 36)
+set(VCPKG_CMAKE_SYSTEM_VERSION 23)
 set(VCPKG_MAKE_BUILD_TRIPLET "--host=aarch64-linux-android")
-set(VCPKG_CMAKE_CONFIGURE_OPTIONS -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-36)
+set(VCPKG_CMAKE_CONFIGURE_OPTIONS -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-23)
 EOF
 
-cat > ~/triplets/x64-android-36.cmake <<'EOF'
+cat > ~/triplets/x64-android-23.cmake <<'EOF'
 set(VCPKG_TARGET_ARCHITECTURE x64)
 set(VCPKG_CRT_LINKAGE dynamic)
 set(VCPKG_LIBRARY_LINKAGE static)
 set(VCPKG_BUILD_TYPE release)
 set(VCPKG_CMAKE_SYSTEM_NAME Android)
-set(VCPKG_CMAKE_SYSTEM_VERSION 36)
+set(VCPKG_CMAKE_SYSTEM_VERSION 23)
 set(VCPKG_MAKE_BUILD_TRIPLET "--host=x86_64-linux-android")
-set(VCPKG_CMAKE_CONFIGURE_OPTIONS -DANDROID_ABI=x86_64 -DANDROID_PLATFORM=android-36)
+set(VCPKG_CMAKE_CONFIGURE_OPTIONS -DANDROID_ABI=x86_64 -DANDROID_PLATFORM=android-23)
 EOF
 ```
 
@@ -93,8 +93,8 @@ EOF
 
 ```bash
 cd ~/vcpkg
-./vcpkg install "curl[http2,http3]" --triplet arm64-android-36 --overlay-triplets=$HOME/triplets
-./vcpkg install "curl[http2,http3]" --triplet x64-android-36  --overlay-triplets=$HOME/triplets
+./vcpkg install "curl[http2,http3]" --triplet arm64-android-23 --overlay-triplets=$HOME/triplets
+./vcpkg install "curl[http2,http3]" --triplet x64-android-23  --overlay-triplets=$HOME/triplets
 ```
 
 > Нужен асинхронный DNS — замени `curl[http2,http3]` на `curl[http2,http3,c-ares]` в обеих командах.
@@ -104,13 +104,13 @@ cd ~/vcpkg
 ```bash
 # HTTP/3, HTTP/2 и OpenSSL включены — должны быть все 4 строки
 grep -hE "define (USE_NGTCP2|USE_NGHTTP3|USE_NGHTTP2|USE_OPENSSL)" \
-  ~/vcpkg/buildtrees/curl/arm64-android-36-rel/lib/curl_config.h
+  ~/vcpkg/buildtrees/curl/arm64-android-23-rel/lib/curl_config.h
 
-# собрано под API 36 — должны быть совпадения
-grep -rl "android36" ~/vcpkg/buildtrees/curl/*.log | head -3
+# собрано под API 23 — должны быть совпадения
+grep -rl "android23" ~/vcpkg/buildtrees/curl/*.log | head -3
 
 # версии всех компонентов
-~/vcpkg/vcpkg list --triplet arm64-android-36
+~/vcpkg/vcpkg list --triplet arm64-android-23
 ```
 
 ## 7. Собрать всё в одну папку
@@ -120,9 +120,9 @@ OUT=~/curl-android
 rm -rf $OUT
 mkdir -p $OUT/include $OUT/libs/arm64-v8a $OUT/libs/x86_64
 
-cp -r ~/vcpkg/installed/arm64-android-36/include/curl $OUT/include/
-cp ~/vcpkg/installed/arm64-android-36/lib/*.a $OUT/libs/arm64-v8a/
-cp ~/vcpkg/installed/x64-android-36/lib/*.a   $OUT/libs/x86_64/
+cp -r ~/vcpkg/installed/arm64-android-23/include/curl $OUT/include/
+cp ~/vcpkg/installed/arm64-android-23/lib/*.a $OUT/libs/arm64-v8a/
+cp ~/vcpkg/installed/x64-android-23/lib/*.a   $OUT/libs/x86_64/
 
 # корневые сертификаты (нужны для доменов с публичными сертификатами)
 curl -fo $OUT/cacert.pem https://curl.se/ca/cacert.pem
@@ -130,10 +130,10 @@ curl -fo $OUT/cacert.pem https://curl.se/ca/cacert.pem
 # паспорт сборки
 {
   echo "NDK: $(grep Pkg.Revision $ANDROID_NDK_HOME/source.properties)"
-  echo "API: 36"
+  echo "API: 23"
   echo "vcpkg commit: $(git -C ~/vcpkg rev-parse HEAD)"
   echo
-  ~/vcpkg/vcpkg list --triplet arm64-android-36
+  ~/vcpkg/vcpkg list --triplet arm64-android-23
   echo
   (cd $OUT && sha256sum libs/*/*.a)
 } > $OUT/BUILD-INFO.txt
@@ -178,7 +178,7 @@ cp -r ~/curl-android ~/curl-android-sources.tar.gz /mnt/c/Users/<твой_пол
 android {
     ndkVersion = "30.0.16248370"
     defaultConfig {
-        minSdk = 36
+        minSdk = 23
     }
 }
 ```
@@ -190,7 +190,7 @@ android {
 Пришли последние ~30 строк вывода. vcpkg в конце пишет путь к логу, обычно вида:
 
 ```
-~/vcpkg/buildtrees/<пакет>/<что-то>-arm64-android-36-rel-out.log
+~/vcpkg/buildtrees/<пакет>/<что-то>-arm64-android-23-rel-out.log
 ```
 
 Его тоже: `tail -50 <путь к логу>`.
