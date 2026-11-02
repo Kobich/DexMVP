@@ -1,19 +1,35 @@
-# Сборка libcurl с HTTP/3 для Android (Ubuntu)
+# libcurl HTTP/3 Build Guide (Ubuntu / WSL)
 
-Итог:
+Цель: собрать в Ubuntu (WSL) из исходников Android-бандл `libcurl` с HTTP/3 и положить его в проект так, чтобы собрался `native-http3`.
 
+Сборка идёт в Linux, результат используется на Windows: это кросс-компиляция через Android NDK, полученные `.a` не зависят от ОС, на которой собирались.
+
+Итоговая папка:
+
+```text
+third_party/curl-android/
+  include/curl/curl.h
+  libs/arm64-v8a/*.a
+  libs/x86_64/*.a
+  cacert.pem
+  BUILD-INFO.txt
 ```
-NDK:  30.0.16248370 (r30)  — такой же должен стоять в Android Studio
-API:  23 для нативных библиотек (= minSdk 23); targetSdk 36 на сборку libcurl не влияет
-ABI:  arm64-v8a (устройства), x86_64 (эмулятор)
-libcurl + ngtcp2 + nghttp3 + nghttp2 + OpenSSL + zlib, всё статически, только release
-```
+
+`arm64-v8a` — физические устройства. `x86_64` — Android emulator на ПК.
+
+## 0. Версии
+
+| Что | Значение | Примечание |
+|---|---|---|
+| Android NDK | `30.0.16248370` (r30) | одинаковый в Ubuntu и в Android Studio |
+| API level нативных библиотек | `23` | равен `minSdk`; `targetSdk 36` на сборку не влияет |
+| ABI | `arm64-v8a`, `x86_64` | |
+| Linkage | static, только release | |
+| Компоненты | curl, ngtcp2, nghttp3, nghttp2, OpenSSL, zlib | последние версии из vcpkg |
 
 Все команды выполняются в Ubuntu, в домашней папке (`~`). Не в `/mnt/c/...`: там сборка медленная и бывают ошибки прав.
 
----
-
-## 0. Проверка
+## 1. Проверить Ubuntu
 
 ```bash
 cd ~
@@ -21,7 +37,7 @@ lsb_release -a   # желательно 22.04 или 24.04
 df -h ~          # нужно ~15 ГБ свободного места
 ```
 
-## 1. Пакеты
+## 2. Поставить пакеты
 
 ```bash
 sudo apt update
@@ -29,7 +45,7 @@ sudo apt install -y build-essential pkg-config cmake ninja-build git curl zip un
                     autoconf automake libtool python3 perl linux-libc-dev
 ```
 
-## 2. NDK 30.0.16248370
+## 3. Поставить NDK
 
 ```bash
 cd ~
@@ -40,20 +56,19 @@ export ANDROID_NDK_HOME=~/android-ndk-${NDK_VER}
 echo "export ANDROID_NDK_HOME=$ANDROID_NDK_HOME" >> ~/.bashrc
 ```
 
-> Если `curl` вернул 404, проверь точное имя архива на https://developer.android.com/ndk/downloads
-> (например, у beta-версий имя вида `android-ndk-r30-beta1-linux.zip`) и поменяй `NDK_VER`.
+Если `curl` вернул 404 — проверить точное имя архива на https://developer.android.com/ndk/downloads (у beta-версий имя вида `android-ndk-r30-beta1-linux.zip`) и поменять `NDK_VER`.
 
-Проверка:
+Проверить:
 
 ```bash
 grep Pkg.Revision $ANDROID_NDK_HOME/source.properties
-# должно быть: Pkg.Revision = 30.0.16248370
+# Pkg.Revision = 30.0.16248370
 
 cat $ANDROID_NDK_HOME/meta/platforms.json
-# "min" должен быть <= 23, иначе этот NDK не умеет собирать под minSdk 23
+# "min" должен быть <= 23
 ```
 
-## 3. vcpkg
+## 4. Подготовить vcpkg
 
 ```bash
 git clone https://github.com/microsoft/vcpkg ~/vcpkg
@@ -61,7 +76,7 @@ cd ~/vcpkg
 ./bootstrap-vcpkg.sh -disableMetrics
 ```
 
-## 4. Триплеты под API 23
+## 5. Создать triplets под API 23
 
 ```bash
 mkdir -p ~/triplets
@@ -89,7 +104,16 @@ set(VCPKG_CMAKE_CONFIGURE_OPTIONS -DANDROID_ABI=x86_64 -DANDROID_PLATFORM=androi
 EOF
 ```
 
-## 5. Сборка (15–40 минут)
+Соответствие triplet и Android ABI:
+
+```text
+arm64-android-23 -> arm64-v8a
+x64-android-23   -> x86_64
+```
+
+## 6. Собрать curl с HTTP/3
+
+Занимает 15–40 минут.
 
 ```bash
 cd ~/vcpkg
@@ -97,12 +121,14 @@ cd ~/vcpkg
 ./vcpkg install "curl[http2,http3]" --triplet x64-android-23  --overlay-triplets=$HOME/triplets
 ```
 
-> Нужен асинхронный DNS — замени `curl[http2,http3]` на `curl[http2,http3,c-ares]` в обеих командах.
+- `http3` — HTTP/3 через `ngtcp2` + `nghttp3` + OpenSSL.
+- `http2` — HTTP/2 внутри libcurl, чтобы был fallback без OkHttp.
+- Если нужен асинхронный DNS — `curl[http2,http3,c-ares]` в обеих командах.
 
-## 6. Проверка результата
+## 7. Проверить сборку
 
 ```bash
-# HTTP/3, HTTP/2 и OpenSSL включены — должны быть все 4 строки
+# должны быть все 4 строки
 grep -hE "define (USE_NGTCP2|USE_NGHTTP3|USE_NGHTTP2|USE_OPENSSL)" \
   ~/vcpkg/buildtrees/curl/arm64-android-23-rel/lib/curl_config.h
 
@@ -113,7 +139,7 @@ grep -rl "android23" ~/vcpkg/buildtrees/curl/*.log | head -3
 ~/vcpkg/vcpkg list --triplet arm64-android-23
 ```
 
-## 7. Собрать всё в одну папку
+## 8. Собрать бандл
 
 ```bash
 OUT=~/curl-android
@@ -124,7 +150,7 @@ cp -r ~/vcpkg/installed/arm64-android-23/include/curl $OUT/include/
 cp ~/vcpkg/installed/arm64-android-23/lib/*.a $OUT/libs/arm64-v8a/
 cp ~/vcpkg/installed/x64-android-23/lib/*.a   $OUT/libs/x86_64/
 
-# корневые сертификаты (нужны для доменов с публичными сертификатами)
+# корневые сертификаты для доменов с публичными сертификатами
 curl -fo $OUT/cacert.pem https://curl.se/ca/cacert.pem
 
 # паспорт сборки
@@ -142,37 +168,47 @@ ls -R $OUT
 cat $OUT/BUILD-INFO.txt
 ```
 
-Ожидаемая структура:
+В `libs/<abi>/` должны быть:
 
+```text
+libcurl.a
+libngtcp2.a
+libngtcp2_crypto_ossl.a
+libnghttp3.a
+libnghttp2.a
+libssl.a
+libcrypto.a
+libz.a
+libcares.a   # только при c-ares
 ```
-curl-android/
-  include/curl/curl.h ...
-  libs/arm64-v8a/  libcurl.a libngtcp2.a libngtcp2_crypto_ossl.a libnghttp3.a libnghttp2.a libssl.a libcrypto.a libz.a
-  libs/x86_64/     то же самое
-  cacert.pem
-  BUILD-INFO.txt
-```
 
-## 8. Сохранить исходники
+## 9. Сохранить исходники
 
-Все исходники, которые скачал vcpkg (curl, OpenSSL, ngtcp2, nghttp3, nghttp2, zlib):
+Все архивы исходников, скачанные vcpkg (curl, OpenSSL, ngtcp2, nghttp3, nghttp2, zlib):
 
 ```bash
 tar czf ~/curl-android-sources.tar.gz -C ~/vcpkg downloads
 ```
 
-## 9. Перенести на Windows
+Нужно для security review и для повторной сборки без интернета.
+
+## 10. Положить бандл в проект
+
+Старый бандл заменить целиком:
 
 ```bash
-cp -r ~/curl-android ~/curl-android-sources.tar.gz /mnt/c/Users/<твой_пользователь>/Desktop/
+PROJECT=/mnt/c/Users/<user>/AndroidStudioProjects/DexMVP
+rm -rf $PROJECT/third_party/curl-android/include $PROJECT/third_party/curl-android/libs
+cp -r ~/curl-android/* $PROJECT/third_party/curl-android/
 ```
 
-Или открыть в проводнике Windows: `\\wsl$\Ubuntu\home\<user>\curl-android`
+Или скопировать через проводник Windows из `\\wsl$\Ubuntu\home\<user>\curl-android`.
 
-## 10. В Android-проекте
+## 11. Подключить в проекте
 
-- В Android Studio: SDK Manager → SDK Tools → NDK (Side by side) → **30.0.16248370**
-- В `build.gradle.kts` модуля с нативным кодом:
+Android Studio: `SDK Manager -> SDK Tools -> NDK (Side by side) -> 30.0.16248370`.
+
+`native-http3/build.gradle.kts`:
 
 ```kotlin
 android {
@@ -183,14 +219,48 @@ android {
 }
 ```
 
----
+`native-http3/src/main/cpp/CMakeLists.txt` — в список `NATIVE_HTTP3_STATIC_DEPENDENCY_LIBS` добавить `libnghttp2.a` (и `libcares.a`, если собирали с c-ares). Иначе линковка упадёт с `undefined symbol: nghttp2_...`:
 
-## Если что-то упало
-
-Пришли последние ~30 строк вывода. vcpkg в конце пишет путь к логу, обычно вида:
-
+```cmake
+set(NATIVE_HTTP3_STATIC_DEPENDENCY_LIBS
+    "${NATIVE_HTTP3_CURL_ROOT}/libs/${ANDROID_ABI}/libnghttp2.a"
+    "${NATIVE_HTTP3_CURL_ROOT}/libs/${ANDROID_ABI}/libngtcp2_crypto_ossl.a"
+    "${NATIVE_HTTP3_CURL_ROOT}/libs/${ANDROID_ABI}/libngtcp2.a"
+    "${NATIVE_HTTP3_CURL_ROOT}/libs/${ANDROID_ABI}/libnghttp3.a"
+    "${NATIVE_HTTP3_CURL_ROOT}/libs/${ANDROID_ABI}/libssl.a"
+    "${NATIVE_HTTP3_CURL_ROOT}/libs/${ANDROID_ABI}/libcrypto.a"
+    "${NATIVE_HTTP3_CURL_ROOT}/libs/${ANDROID_ABI}/libz.a"
+)
 ```
+
+## 12. Проверить на Windows
+
+```powershell
+.\scripts\check-curl-android-layout.ps1
+.\scripts\verify-native-http3-curl.ps1
+.\scripts\build-http3-apk.ps1 -Abi x86_64
+```
+
+## Если Что-то Упало
+
+Прислать последние ~30 строк вывода. vcpkg в конце пишет путь к логу, обычно вида:
+
+```text
 ~/vcpkg/buildtrees/<пакет>/<что-то>-arm64-android-23-rel-out.log
 ```
 
-Его тоже: `tail -50 <путь к логу>`.
+```bash
+tail -50 <путь к логу>
+```
+
+### `undefined symbol` при сборке `native-http3`
+
+Не хватает библиотеки в `NATIVE_HTTP3_STATIC_DEPENDENCY_LIBS` (см. шаг 11) или бандл собран под другой ABI.
+
+### `cannot locate symbol` при запуске приложения
+
+Бандл собран под API выше `minSdk`. Проверить шаг 7 (`android23`) и triplets.
+
+### Ошибки TLS для доменов
+
+Передать в libcurl `cacert.pem` (склеенный со своим корневым сертификатом, если он есть) через `CURLOPT_CAINFO`.
